@@ -384,15 +384,28 @@ class RiskExecutionBacktestTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 cfg = load_config()
                 dataset_path = Path(tmp) / "transactions.json"
+                price_path = Path(tmp) / "prices.json"
                 reports_dir = Path(tmp) / "reports"
-                cfg["backtest"] = {"dataset_path": str(dataset_path)}
+                cfg["backtest"] = {"dataset_path": str(dataset_path), "price_history_path": str(price_path)}
                 cfg["reports_dir"] = str(reports_dir)
                 run_backtest_scheduler.load_config = lambda: cfg
                 write_json(dataset_path, sample_transactions())
+                write_json(
+                    price_path,
+                    {
+                        "prices": {
+                            "AAPL": {"2026-06-01": 100.0, "2026-06-03": 101.0},
+                            "MSFT": {"2026-06-02": 200.0, "2026-06-03": 202.0},
+                            "NVDA": {"2026-06-03": 300.0},
+                            "SPY": {"2026-06-01": 500.0, "2026-06-03": 501.0},
+                        }
+                    },
+                )
 
                 result = run_backtest_scheduler.run(dry_run=False, days=180)
 
                 self.assertEqual(result["dataset"], str(dataset_path))
+                self.assertEqual(result["price_history_dataset"], str(price_path))
                 self.assertEqual(result["input_transactions"], len(sample_transactions()))
                 self.assertTrue((reports_dir / "backtest" / "latest.json").exists())
         finally:

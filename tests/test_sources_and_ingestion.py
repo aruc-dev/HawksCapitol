@@ -305,6 +305,7 @@ class SourcesAndIngestionTests(unittest.TestCase):
         resolved = [resolver.resolve(asset) == symbol for asset, symbol in fixtures.items()]
         self.assertGreaterEqual(sum(resolved) / len(resolved), 0.95)
         self.assertEqual(resolver.resolve("Unlisted Holding (aapl)"), "AAPL")
+        self.assertEqual(resolver.resolve("V"), "V")
 
     def test_dedupe_and_reconcile_prefer_official(self) -> None:
         _, txs = normalize_records([

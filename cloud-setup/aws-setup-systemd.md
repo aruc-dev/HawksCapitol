@@ -102,13 +102,14 @@ troubleshooting or a manual rebuild on an already provisioned host:
 ```bash
 sudo dnf update -y
 sudo dnf install -y git python3 python3-pip python3-virtualenv awscli
-git clone https://github.com/aruc-dev/HawksCapitol.git /home/ec2-user/HawksCapitol
+sudo -u ec2-user git clone https://github.com/aruc-dev/HawksCapitol.git /home/ec2-user/HawksCapitol
 cd /home/ec2-user/HawksCapitol
-python3 -m venv .venv
+sudo chown -R ec2-user:ec2-user /home/ec2-user/HawksCapitol
+sudo -u ec2-user python3 -m venv .venv
 . .venv/bin/activate
-pip install -r requirements.txt
-python3 -m unittest discover -v
-python3 scheduler/run_health_check.py --dry-run
+sudo -u ec2-user .venv/bin/pip install -r requirements.txt
+sudo -u ec2-user .venv/bin/python -m unittest discover -v
+sudo -u ec2-user .venv/bin/python scheduler/run_health_check.py --dry-run
 ```
 
 Verify the remote is the approved repository before deploying:

@@ -52,19 +52,22 @@ class TerraformDeploymentTests(unittest.TestCase):
 
         for expected in (
             "git clone",
-            "git reset --hard",
+            "runuser -u ec2-user",
+            "chown -R ec2-user:ec2-user",
+            'git -C "$${repo_dir}" reset --hard',
             "pip install -r requirements.txt",
             "cp scheduler/systemd/hawkscapitol-*.service",
             "hawkscapitol-secrets.service.d",
             'Environment="HAWKSCAPITOL_SECRET_ID=$${secret_id}"',
             "systemctl daemon-reload",
-            "HAWKSCAPITOL_DRY_RUN=1 scripts/fetch_secrets.sh",
+            'HAWKSCAPITOL_DRY_RUN=1 "$${repo_dir}/scripts/fetch_secrets.sh"',
             "python3 -m unittest discover -v",
             "python3 scheduler/run_health_check.py --dry-run",
             "python3 scheduler/run_live_promotion_check.py --dry-run",
             "enable_systemd_timers",
         ):
             self.assertIn(expected, text)
+        self.assertIn('run_as_ec2 bash -c', text)
 
     def test_github_actions_workflow_uses_oidc_and_remote_backend(self) -> None:
         workflow = (REPO_ROOT / ".github" / "workflows" / "terraform-deploy.yml").read_text(encoding="utf-8")

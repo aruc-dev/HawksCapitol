@@ -28,6 +28,7 @@ DEFAULT_ALIASES = {
     "jpmorgan chase": "JPM",
     "johnson johnson": "JNJ",
     "visa inc": "V",
+    "v": "V",
     "mastercard": "MA",
     "eli lilly": "LLY",
     "broadcom": "AVGO",
@@ -102,5 +103,8 @@ def _normalize_name(value: str) -> str:
     text = value.lower().replace("&", " and ")
     text = re.sub(r"\([^)]*\)", " ", text)
     text = re.sub(r"[^a-z0-9]+", " ", text)
-    tokens = [token for token in text.split() if token not in CORPORATE_SUFFIXES and len(token) > 1]
+    tokens = [token for token in text.split() if token not in CORPORATE_SUFFIXES]
+    multi_char_tokens = [token for token in tokens if len(token) > 1]
+    if multi_char_tokens:
+        tokens = multi_char_tokens
     return " ".join(tokens)
