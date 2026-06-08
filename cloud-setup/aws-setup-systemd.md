@@ -76,7 +76,7 @@ paper secret only:
     {
       "Effect": "Allow",
       "Action": ["secretsmanager:GetSecretValue"],
-      "Resource": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:hawkscapitol/*"
+      "Resource": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:hawkscapitol/keys-*"
     }
   ]
 }

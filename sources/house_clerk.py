@@ -279,7 +279,10 @@ def _logical_lines(text: str) -> list[str]:
     lines = []
     for line in text.splitlines():
         line = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", line)
-        clean = re.sub(r"\s+", " ", line).strip()
+        if "\t" in line:
+            clean = "\t".join(re.sub(r"[^\S\t]+", " ", part).strip() for part in line.split("\t")).strip()
+        else:
+            clean = re.sub(r"\s+", " ", line).strip()
         if clean:
             lines.append(clean)
     return lines

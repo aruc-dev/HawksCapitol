@@ -63,5 +63,5 @@ jobs:
         run: terraform plan -out=tfplan
 
       - name: Terraform apply
-        if: ${{ inputs.apply }}
+        if: ${{ inputs.apply == true || inputs.apply == 'true' }}
         run: terraform apply -auto-approve tfplan

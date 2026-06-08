@@ -76,8 +76,15 @@ class TerraformDeploymentTests(unittest.TestCase):
         self.assertIn('backend "s3"', workflow)
         self.assertIn("terraform plan -out=tfplan", workflow)
         self.assertIn("terraform apply -auto-approve tfplan", workflow)
+        self.assertIn("inputs.apply == true || inputs.apply == 'true'", workflow)
         self.assertNotIn("AWS_ACCESS_KEY_ID", workflow)
         self.assertNotIn("AWS_SECRET_ACCESS_KEY", workflow)
+
+    def test_iam_docs_scope_instance_secret_access_to_paper_secret(self) -> None:
+        docs = (REPO_ROOT / "cloud-setup" / "aws-setup-systemd.md").read_text(encoding="utf-8")
+
+        self.assertIn("arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:hawkscapitol/keys-*", docs)
+        self.assertNotIn("arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:hawkscapitol/*", docs)
 
     def test_terraform_artifacts_and_state_are_gitignored(self) -> None:
         ignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")

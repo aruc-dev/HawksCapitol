@@ -173,6 +173,17 @@ class SourcesAndIngestionTests(unittest.TestCase):
         self.assertEqual(result["transactions"], 1)
         self.assertIn("would_write", result)
 
+    def test_house_ptr_parser_preserves_tab_delimited_rows(self) -> None:
+        text = "Transaction Date\tAsset\tTicker\tTransaction Type\tAmount\tOwner\n2026-05-01\tApple Inc.\tAAPL\tPurchase\t$1,001 - $15,000\tself"
+        raw = RawFiling("house_clerk", "tab-1", "Demo Representative", date(2026, 6, 1))
+
+        rows = parse_house_ptr_text(text, raw, 0.9)
+
+        self.assertEqual(rows[0]["ticker"], "AAPL")
+        self.assertEqual(rows[0]["tx_date"], "2026-05-01")
+        self.assertEqual(rows[0]["amount"], "$1,001 - $15,000")
+        self.assertIn("\t", rows[0]["raw_ref"])
+
     def test_senate_html_parser_maps_rows(self) -> None:
         html = "<table><tr><th>Transaction Date</th><th>Asset Name</th><th>Ticker</th><th>Transaction Type</th><th>Amount</th></tr><tr><td>2026-05-01</td><td>Apple Inc.</td><td>AAPL</td><td>Purchase</td><td>$1,001 - $15,000</td></tr></table>"
         rows = parse_senate_ptr_html(html)
