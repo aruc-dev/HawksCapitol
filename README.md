@@ -56,6 +56,9 @@ Without `--dry-run`, the scan reads canonical transactions from
 `<data_dir>/canonical/transactions.json` and the sector map from `config/sectors.json`;
 missing canonical transactions produce no signals or paper orders rather than falling
 back to demo data.
+Non-dry-run daily and weekly reports aggregate persisted runtime artifacts, such as
+latest signals, backtest output, risk decisions, and health status, instead of invoking
+dry-run fixture paths.
 
 ## AWS Deployment
 
