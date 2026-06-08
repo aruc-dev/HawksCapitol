@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from zipfile import ZipFile
 
+import ingestion.reconciler as reconciler_module
 from ingestion.pdf_parser import extract_text_from_pdf_bytes
 from ingestion.dedupe import dedupe_transactions
 from ingestion.normalizer import normalize_records, parse_amount_range
@@ -279,6 +280,12 @@ class SourcesAndIngestionTests(unittest.TestCase):
         rows = source.parse(filings[0])
         self.assertEqual(rows[0]["source_quality"], "third_party_only")
         self.assertEqual(rows[0]["ticker"], "AAPL")
+        fmp_with_bad_rows = FMPSource(fixture_payload=[{}, {"filing_date": "not-a-date"}, *fixture])
+        self.assertEqual(len(fmp_with_bad_rows.fetch(date(2026, 1, 1))), 1)
+        self.assertIn("skipped 2 invalid rows", fmp_with_bad_rows.health().message)
+        congress_with_bad_rows = CongressInvestsSource(fixture_payload=[{"filingDate": ""}, {"filingDate": "broken"}, *fixture])
+        self.assertEqual(len(congress_with_bad_rows.fetch(date(2026, 1, 1))), 1)
+        self.assertIn("skipped 2 invalid rows", congress_with_bad_rows.health().message)
 
     def test_enabled_source_ingest_reports_per_source_health(self) -> None:
         result = run_ingest.run(dry_run=True, source="enabled", since=date(2026, 1, 1), year=2026)
@@ -292,6 +299,8 @@ class SourcesAndIngestionTests(unittest.TestCase):
         with self.assertRaises(HistorySourceBlocked):
             validate_history_source(registry["stock_watcher"], fixture_only=False)
         stock_result = load_stock_watcher_records([
+            {"doc_id": "bad-missing-date", "ticker": "MSFT"},
+            {"doc_id": "bad-date", "filing_date": "not-a-date", "ticker": "MSFT"},
             {
                 "doc_id": "sw-1",
                 "member_name": "Demo Senator",
@@ -304,6 +313,7 @@ class SourcesAndIngestionTests(unittest.TestCase):
             }
         ], date(2024, 1, 1), fixture_only=True)
         self.assertEqual(stock_result.records[0]["source"], "stock_watcher")
+        self.assertIn("skipped 2 invalid rows", stock_result.health[0].message)
         house_zip = _zip_bytes(
             "2024FD.xml",
             """
@@ -371,6 +381,46 @@ class SourcesAndIngestionTests(unittest.TestCase):
         reconciled, warnings = reconcile_transactions(txs)
         self.assertEqual(len(reconciled), 1)
         self.assertTrue(any("reconciled" in warning for warning in warnings))
+
+    def test_reconcile_buckets_before_fuzzy_matching(self) -> None:
+        _, txs = normalize_records([
+            {
+                "doc_id": "first",
+                "source": "house_clerk",
+                "member_name": "Demo Senator",
+                "filing_date": "2026-06-01",
+                "tx_date": "2026-05-01",
+                "asset_name": "Apple Inc.",
+                "tx_type": "Purchase",
+                "amount": "$1,001 - $15,000",
+                "source_quality": "official",
+            },
+            {
+                "doc_id": "second",
+                "source": "house_clerk",
+                "member_name": "Demo Senator",
+                "filing_date": "2026-06-02",
+                "tx_date": "2026-05-02",
+                "asset_name": "Apple Inc.",
+                "tx_type": "Purchase",
+                "amount": "$1,001 - $15,000",
+                "source_quality": "official",
+            },
+        ], TickerResolver())
+        original_same_disclosed_trade = reconciler_module.same_disclosed_trade
+
+        def guarded_same_disclosed_trade(left, right):
+            if (left.member_id, left.tx_type, left.tx_date) != (right.member_id, right.tx_type, right.tx_date):
+                raise AssertionError("cross-bucket fuzzy comparison")
+            return original_same_disclosed_trade(left, right)
+
+        try:
+            reconciler_module.same_disclosed_trade = guarded_same_disclosed_trade
+            reconciled, _ = reconcile_transactions(txs)
+        finally:
+            reconciler_module.same_disclosed_trade = original_same_disclosed_trade
+
+        self.assertEqual(len(reconciled), 2)
 
     def test_committee_snapshots_are_point_in_time(self) -> None:
         snapshots = [

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sources.base import RawFiling, SourceHealth
+from sources.base import RawFiling, SourceHealth, first_parseable_date
 
 
 class StockWatcherSource:
@@ -15,14 +15,21 @@ class StockWatcherSource:
 
     def fetch(self, since: date) -> list[RawFiling]:
         filings = []
+        skipped = 0
         for idx, record in enumerate(self.records):
-            filing_date = date.fromisoformat(str(record.get("filing_date") or record.get("disclosure_date") or record.get("disclosureDate"))[:10])
+            filing_date = first_parseable_date(record, "filing_date", "disclosure_date", "disclosureDate")
+            if filing_date is None:
+                skipped += 1
+                continue
             if filing_date >= since:
                 doc_id = str(record.get("doc_id") or record.get("document_id") or f"sw-{idx}")
                 member = record.get("member_name") or record.get("senator") or record.get("representative") or "Unknown"
                 filings.append(RawFiling(self.name, doc_id, member, filing_date, payload=[record]))
         newest = max((filing.filing_date for filing in filings), default=None)
-        self._last_health = SourceHealth(self.name, bool(self.records), newest, f"{len(filings)} history rows")
+        message = f"{len(filings)} history rows"
+        if skipped:
+            message += f"; skipped {skipped} invalid rows"
+        self._last_health = SourceHealth(self.name, bool(self.records), newest, message)
         return filings
 
     def parse(self, raw: RawFiling) -> list[dict]:

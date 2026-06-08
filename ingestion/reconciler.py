@@ -7,13 +7,16 @@ from ingestion.dedupe import dedupe_transactions, same_disclosed_trade
 def reconcile_transactions(transactions: list[Transaction]) -> tuple[list[Transaction], list[str]]:
     warnings: list[str] = []
     groups: list[list[Transaction]] = []
-    for tx in transactions:
-        for group in groups:
-            if any(existing.dedup_key == tx.dedup_key or same_disclosed_trade(existing, tx) for existing in group):
-                group.append(tx)
-                break
-        else:
-            groups.append([tx])
+    for bucket in _bucket_transactions(transactions).values():
+        bucket_groups: list[list[Transaction]] = []
+        for tx in bucket:
+            for group in bucket_groups:
+                if any(existing.dedup_key == tx.dedup_key or same_disclosed_trade(existing, tx) for existing in group):
+                    group.append(tx)
+                    break
+            else:
+                bucket_groups.append([tx])
+        groups.extend(bucket_groups)
     winners: list[Transaction] = []
     for group in groups:
         official = [tx for tx in group if tx.source_quality == "official"]
@@ -24,6 +27,14 @@ def reconcile_transactions(transactions: list[Transaction]) -> tuple[list[Transa
             warnings.extend(_conflict_warnings(group, winner))
         winners.append(winner)
     return dedupe_transactions(winners), warnings
+
+
+def _bucket_transactions(transactions: list[Transaction]) -> dict[tuple[str, str, object], list[Transaction]]:
+    buckets: dict[tuple[str, str, object], list[Transaction]] = {}
+    for tx in transactions:
+        key = (tx.member_id, tx.tx_type, tx.tx_date)
+        buckets.setdefault(key, []).append(tx)
+    return buckets
 
 
 def _conflict_warnings(group: list[Transaction], winner: Transaction) -> list[str]:

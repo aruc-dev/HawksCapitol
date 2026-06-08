@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 import unittest
 from datetime import date
+from pathlib import Path
+import tempfile
 
+from broker.paper_broker import PaperBroker
+from core.models import Order
 from dashboard.app import render_dashboard_html
 from scheduler import run_health_check, run_report
 
@@ -25,6 +29,22 @@ class ReportingDashboardTests(unittest.TestCase):
         self.assertIn("house_clerk", stale_sources)
         self.assertIn("senate_efd", stale_sources)
         self.assertTrue(payload["ok"])
+
+    def test_health_check_reads_paper_broker_from_configured_data_dir(self) -> None:
+        original_load_config = run_health_check.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = original_load_config()
+                cfg["data_dir"] = str(Path(tmp) / "custom-data")
+                state_path = Path(cfg["data_dir"]) / "paper_broker" / "state.json"
+                PaperBroker(state_path).submit(Order("health-state", "AAPL", "buy", 3, limit_price=100.0))
+                run_health_check.load_config = lambda: cfg
+
+                payload = run_health_check.run(dry_run=True, as_of=date(2026, 6, 8))
+
+                self.assertEqual(payload["broker"]["positions"][0]["ticker"], "AAPL")
+        finally:
+            run_health_check.load_config = original_load_config
 
     def test_daily_report_and_dashboard_render_without_flask(self) -> None:
         report = run_report.run(dry_run=True)

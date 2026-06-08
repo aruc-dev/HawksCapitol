@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from backtest.metrics import compute_metrics
 from backtest.simulator import run_backtest
 from analytics.member_score import compute_member_scores
 from broker.paper_broker import PaperBroker
@@ -247,6 +248,10 @@ class RiskExecutionBacktestTests(unittest.TestCase):
             self.assertIn(key, result["metrics"])
         self.assertIn(result["validation"]["verdict"], {"pass", "watch", "fail"})
         self.assertIn("spy", result["baselines"])
+
+    def test_cagr_uses_return_period_count(self) -> None:
+        metrics = compute_metrics([100.0, 110.0], periods_per_year=252)
+        self.assertEqual(metrics["cagr"], round((1.10 ** 252) - 1, 6))
 
     def test_backtest_lookahead_guard_and_reproducibility(self) -> None:
         cfg = load_config()

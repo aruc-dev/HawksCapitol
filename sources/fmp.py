@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 import os
 
-from sources.base import RawFiling, SourceHealth
+from sources.base import RawFiling, SourceHealth, first_parseable_date
 
 
 FMP_ENDPOINT = "https://financialmodelingprep.com/stable/senate-trading"
@@ -17,12 +17,13 @@ class FMPSource:
         self.fixture_payload = fixture_payload
         self.session = session
         self.endpoint = endpoint
+        self._skipped_rows = 0
         self._last_health = SourceHealth(self.name, False, message="disabled until free entitlement is verified")
 
     def fetch(self, since: date) -> list[RawFiling]:
         if self.fixture_payload is not None:
             filings = self._filings_from_rows(self.fixture_payload, since)
-            self._last_health = SourceHealth(self.name, True, max((f.filing_date for f in filings), default=None), "fixture")
+            self._last_health = SourceHealth(self.name, True, max((f.filing_date for f in filings), default=None), self._health_message("fixture", len(filings)))
             return filings
         if not self.api_key:
             self._last_health = SourceHealth(self.name, False, message="missing free API key; self-disabled")
@@ -37,7 +38,7 @@ class FMPSource:
             return []
         rows = response.json()
         filings = self._filings_from_rows(rows if isinstance(rows, list) else rows.get("data", []), since)
-        self._last_health = SourceHealth(self.name, True, max((f.filing_date for f in filings), default=None), f"{len(filings)} rows")
+        self._last_health = SourceHealth(self.name, True, max((f.filing_date for f in filings), default=None), self._health_message("rows", len(filings)))
         return filings
 
     def parse(self, raw: RawFiling) -> list[dict]:
@@ -49,14 +50,24 @@ class FMPSource:
 
     def _filings_from_rows(self, rows: list[dict], since: date) -> list[RawFiling]:
         filings = []
+        self._skipped_rows = 0
         for idx, row in enumerate(rows):
-            filing_date = date.fromisoformat(str(row.get("filing_date") or row.get("filingDate") or row.get("disclosureDate"))[:10])
+            filing_date = first_parseable_date(row, "filing_date", "filingDate", "disclosureDate")
+            if filing_date is None:
+                self._skipped_rows += 1
+                continue
             if filing_date < since:
                 continue
             doc_id = str(row.get("doc_id") or row.get("documentId") or f"fmp-{idx}")
             member = row.get("member_name") or row.get("representative") or row.get("senator") or "Unknown"
             filings.append(RawFiling(self.name, doc_id, member, filing_date, payload=row))
         return filings
+
+    def _health_message(self, label: str, count: int) -> str:
+        message = label if label == "fixture" else f"{count} {label}"
+        if self._skipped_rows:
+            message += f"; skipped {self._skipped_rows} invalid rows"
+        return message
 
 
 def _normalize_row(raw: RawFiling, row: dict) -> dict:

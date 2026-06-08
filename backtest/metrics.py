@@ -25,7 +25,7 @@ def compute_metrics(
     if benchmark_curve and benchmark_curve[0]:
         benchmark_return = (benchmark_curve[-1] - benchmark_curve[0]) / benchmark_curve[0]
     total = (end - start) / start if start else 0.0
-    years = max(1 / periods_per_year, len(equity_curve) / periods_per_year)
+    years = max(1 / periods_per_year, (len(equity_curve) - 1) / periods_per_year)
     cagr = (end / start) ** (1 / years) - 1 if start and end > 0 else 0.0
     sharpe = _sharpe(returns, periods_per_year)
     trades = trades or []

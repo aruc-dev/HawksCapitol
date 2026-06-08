@@ -23,7 +23,7 @@ def run(dry_run: bool = False, as_of: date | None = None) -> dict:
     transactions = _load_transactions(dry_run, cfg)
     source_status = _source_status(cfg, registry, transactions, as_of)
     alerts = _alerts(source_status, cfg)
-    broker = PaperBroker("data/paper_broker/state.json")
+    broker = PaperBroker(Path(cfg.get("data_dir", "data")) / "paper_broker" / "state.json")
     payload = {
         "ok": not any(alert["severity"] == "error" for alert in alerts),
         "enabled_sources": sorted(name for name, active in cfg["sources"].items() if active),
