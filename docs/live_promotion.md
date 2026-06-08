@@ -19,6 +19,11 @@ The gate is checked by:
 python3 scheduler/run_live_promotion_check.py --dry-run
 ```
 
+With `--dry-run`, the command uses the deterministic sample backtest only for local
+scheduler validation. Without `--dry-run`, it reads the persisted real backtest report
+from `<reports_dir>/backtest/latest.json`. Missing, malformed, sample-backed, or
+fallback-return reports are treated as non-passing evidence and block live promotion.
+
 Supplying paper evidence still does not switch modes:
 
 ```bash

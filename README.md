@@ -75,6 +75,9 @@ back to demo data.
 Non-dry-run daily and weekly reports aggregate persisted runtime artifacts, such as
 latest signals, backtest output, risk decisions, and health status, instead of invoking
 dry-run fixture paths.
+Non-dry live-promotion checks also read the persisted real backtest report from
+`reports/backtest/latest.json`; missing, malformed, sample-backed, or fallback-return
+reports are treated as non-passing evidence.
 Malformed persisted filing dates are ignored for source freshness, and malformed option
 expiries are treated as unknown so health/report/exit timers keep evaluating remaining
 paper-risk controls.
