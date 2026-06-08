@@ -54,6 +54,8 @@ class TerraformDeploymentTests(unittest.TestCase):
             "git reset --hard",
             "pip install -r requirements.txt",
             "cp scheduler/systemd/hawkscapitol-*.service",
+            "hawkscapitol-secrets.service.d",
+            'Environment="HAWKSCAPITOL_SECRET_ID=$${secret_name}"',
             "systemctl daemon-reload",
             "HAWKSCAPITOL_DRY_RUN=1 scripts/fetch_secrets.sh",
             "python3 -m unittest discover -v",

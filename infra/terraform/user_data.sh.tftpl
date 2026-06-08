@@ -39,6 +39,11 @@ PY
 install -d -m 0755 /etc/systemd/system
 cp scheduler/systemd/hawkscapitol-*.service /etc/systemd/system/
 cp scheduler/systemd/hawkscapitol-*.timer /etc/systemd/system/
+install -d -m 0755 /etc/systemd/system/hawkscapitol-secrets.service.d
+cat >/etc/systemd/system/hawkscapitol-secrets.service.d/10-terraform-secret.conf <<EOF
+[Service]
+Environment="HAWKSCAPITOL_SECRET_ID=$${secret_name}"
+EOF
 systemctl daemon-reload
 
 HAWKSCAPITOL_SECRET_ID="$${secret_name}" HAWKSCAPITOL_DRY_RUN=1 scripts/fetch_secrets.sh

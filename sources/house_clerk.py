@@ -10,7 +10,7 @@ from zipfile import ZipFile
 from io import BytesIO
 
 from ingestion.pdf_parser import extract_text_from_pdf_bytes
-from sources.base import RawFiling, SourceHealth
+from sources.base import RawFiling, SourceHealth, parse_optional_date
 
 
 HOUSE_INDEX_URL = "https://disclosures-clerk.house.gov/public_disc/financial-pdfs/{year}FD.zip"
@@ -29,6 +29,8 @@ def parse_house_index(xml_text: str, year: int) -> list[RawFiling]:
             continue
         name = children.get("name") or "Unknown"
         filing_date = _parse_house_date(children.get("filingdate") or children.get("filing_date"), year)
+        if filing_date is None:
+            continue
         filings.append(
             RawFiling(
                 source="house_clerk",
@@ -210,7 +212,7 @@ def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
-def _parse_house_date(value: str | None, year: int) -> date:
+def _parse_house_date(value: str | None, year: int) -> date | None:
     if not value:
         return date(year, 1, 1)
     text = value.strip()
@@ -221,7 +223,7 @@ def _parse_house_date(value: str | None, year: int) -> date:
             return datetime.strptime(text, fmt).date()
         except ValueError:
             continue
-    return date.fromisoformat(text[:10])
+    return parse_optional_date(text)
 
 
 def _logical_lines(text: str) -> list[str]:

@@ -63,9 +63,8 @@ KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def quote_env(value: object) -> str:
-    text = str(value)
-    text = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-    return f'"{text}"'
+    text = str(value).replace("\n", "\\n")
+    return "'" + text.replace("'", "'\"'\"'") + "'"
 
 
 raw_path, env_path = sys.argv[1], sys.argv[2]
@@ -96,7 +95,7 @@ else:
         key = key.strip()
         if not KEY_RE.match(key):
             raise SystemExit(f"invalid environment key in secret: {key}")
-        lines.append(f"{key}={value.strip()}\n")
+        lines.append(f"{key}={quote_env(value.strip())}\n")
 
 if not lines:
     raise SystemExit("secret contains no environment values")

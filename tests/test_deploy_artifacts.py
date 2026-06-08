@@ -104,6 +104,35 @@ class DeployArtifactTests(unittest.TestCase):
             )
             self.assertIn("validation ok", validated.stdout)
 
+        with tempfile.TemporaryDirectory() as tmp:
+            aws_cli = Path(tmp) / "fake-aws"
+            env_file = Path(tmp) / "hawks.env"
+            aws_cli.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' 'ALPACA_API_KEY=key with spaces' 'ALPACA_SECRET_KEY=value$(echo pwn)'\n",
+                encoding="utf-8",
+            )
+            aws_cli.chmod(0o755)
+            line_env = os.environ.copy()
+            line_env.update({"AWS_CLI": str(aws_cli), "HAWKSCAPITOL_ENV_FILE": str(env_file)})
+            subprocess.run(
+                ["bash", "scripts/fetch_secrets.sh"],
+                cwd=REPO_ROOT,
+                env=line_env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            rendered = env_file.read_text(encoding="utf-8")
+            self.assertIn("ALPACA_API_KEY='key with spaces'", rendered)
+            self.assertIn("ALPACA_SECRET_KEY='value$(echo pwn)'", rendered)
+            sourced = subprocess.run(
+                ["bash", "-c", f". {env_file}; printf '%s' \"$ALPACA_SECRET_KEY\""],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(sourced.stdout, "value$(echo pwn)")
+
     def test_cron_and_launchd_reference_all_scheduler_jobs(self) -> None:
         cron_text = (REPO_ROOT / "cron" / "hawkscapitol.crontab").read_text(encoding="utf-8")
         for script in SCHEDULED_JOBS.values():

@@ -67,6 +67,7 @@ class SourcesAndIngestionTests(unittest.TestCase):
         <FinancialDisclosureReports>
           <Report><DocID>100</DocID><FilingType>P</FilingType><Name>Demo Senator</Name><FilingDate>2026-06-01</FilingDate></Report>
           <Report><DocID>101</DocID><FilingType>A</FilingType><Name>Other</Name><FilingDate>2026-06-01</FilingDate></Report>
+          <Report><DocID>102</DocID><FilingType>P</FilingType><Name>Bad Date</Name><FilingDate>not-a-date</FilingDate></Report>
         </FinancialDisclosureReports>
         """
         filings = parse_house_index(xml, 2026)
