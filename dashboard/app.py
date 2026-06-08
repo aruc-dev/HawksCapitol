@@ -5,8 +5,8 @@ from html import escape
 from scheduler.run_report import run as run_report
 
 
-def render_dashboard_html(report: dict | None = None) -> str:
-    report = report or run_report(dry_run=True)
+def render_dashboard_html(report: dict | None = None, dry_run: bool = False) -> str:
+    report = report if report is not None else run_report(dry_run=dry_run)
     source_rows = "".join(
         f"<tr><td>{escape(name)}</td><td>{status['enabled']}</td><td>{escape(status['production_status'])}</td><td>{status['newest_filing_date'] or ''}</td><td>{status['stale_days'] if status['stale_days'] is not None else ''}</td></tr>"
         for name, status in sorted(report["health"]["source_status"].items())

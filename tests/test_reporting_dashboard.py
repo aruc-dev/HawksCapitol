@@ -8,6 +8,7 @@ import tempfile
 
 from broker.paper_broker import PaperBroker
 from core.models import Order
+from dashboard import app as dashboard_app
 from dashboard.app import render_dashboard_html
 from ingestion.storage import read_json, write_json
 from scheduler import run_health_check, run_report, run_weekly_report
@@ -92,6 +93,26 @@ class ReportingDashboardTests(unittest.TestCase):
         self.assertIn("Signals", html)
         self.assertIn("Sources", html)
         self.assertIn("house_clerk", html)
+
+    def test_dashboard_default_uses_persisted_report_mode(self) -> None:
+        original_run_report = dashboard_app.run_report
+        calls = []
+        report = {
+            "summary": {"signals": 0, "backtest_verdict": "not_available", "health_ok": True},
+            "scan": {"signals": []},
+            "health": {"source_status": {}, "alerts": []},
+        }
+        try:
+            dashboard_app.run_report = lambda dry_run=False: calls.append(dry_run) or report
+
+            html = dashboard_app.render_dashboard_html()
+            preview_html = dashboard_app.render_dashboard_html(dry_run=True)
+
+            self.assertEqual(calls, [False, True])
+            self.assertIn("not_available", html)
+            self.assertIn("not_available", preview_html)
+        finally:
+            dashboard_app.run_report = original_run_report
 
     def test_reports_use_configured_reports_dir(self) -> None:
         original_daily_load_config = run_report.load_config

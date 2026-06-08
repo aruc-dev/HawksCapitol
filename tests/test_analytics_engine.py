@@ -158,6 +158,26 @@ class AnalyticsEngineTests(unittest.TestCase):
         self.assertEqual(heat["Technology"]["sample_count"], 3)
         self.assertGreater(heat["Technology"]["avg_alpha_30d"], 0.0)
 
+    def test_sector_heatmap_alpha_uses_nearest_trading_days(self) -> None:
+        tx = sample_transactions()[0]
+        tx = tx.__class__(
+            **{
+                **tx.__dict__,
+                "tx_date": date(2026, 6, 1),
+                "filing_date": date(2026, 6, 2),
+                "ticker": "AAPL",
+            }
+        )
+        prices = {
+            "AAPL": {date(2026, 6, 3): 100.0, date(2026, 7, 1): 110.0},
+            "SPY": {date(2026, 6, 3): 100.0, date(2026, 7, 1): 102.0},
+        }
+
+        heat = compute_sector_heatmap([tx], {"AAPL": "Technology"}, date(2026, 7, 5), price_history=prices, lookback_days=45)
+
+        self.assertEqual(heat["Technology"]["sample_count"], 1)
+        self.assertAlmostEqual(heat["Technology"]["avg_alpha_30d"], 0.08, places=6)
+
     def test_copy_signal_blocks_and_allows_candidates(self) -> None:
         cfg = load_config()
         txs = sample_transactions()

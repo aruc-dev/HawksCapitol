@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from core.models import Transaction
+from core.price_history import window_return
 
 
 def compute_sector_heatmap(
@@ -46,10 +47,8 @@ def _alpha_30(tx: Transaction, price_history: dict[str, dict[date, float]], as_o
         return None
     prices = price_history.get(tx.ticker.upper(), {})
     benchmark = price_history.get("SPY", {})
-    start = prices.get(tx.tx_date)
-    end = prices.get(end_date)
-    bench_start = benchmark.get(tx.tx_date)
-    bench_end = benchmark.get(end_date)
-    if not start or not end or not bench_start or not bench_end:
+    symbol_return = window_return(prices, tx.tx_date, end_date)
+    benchmark_return = window_return(benchmark, tx.tx_date, end_date)
+    if symbol_return is None or benchmark_return is None:
         return None
-    return ((end - start) / start) - ((bench_end - bench_start) / bench_start)
+    return symbol_return - benchmark_return

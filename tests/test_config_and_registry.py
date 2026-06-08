@@ -35,15 +35,17 @@ class ConfigAndRegistryTests(unittest.TestCase):
                 validate_enabled_sources(toggles, registry)
 
     def test_python310_compatible_datetime_utc_usage(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
         offenders = []
         import_pattern = r"^from datetime import .*" + r"\bUTC\b"
         direct_reference = "datetime." + "UTC"
-        for path in Path(".").rglob("*.py"):
-            if any(part in {".git", ".venv", "__pycache__"} for part in path.parts):
+        for path in repo_root.rglob("*.py"):
+            relative_path = path.relative_to(repo_root)
+            if any(part in {".git", ".venv", "__pycache__"} for part in relative_path.parts):
                 continue
             text = path.read_text(encoding="utf-8")
             if re.search(import_pattern, text, flags=re.MULTILINE) or direct_reference in text:
-                offenders.append(str(path))
+                offenders.append(str(relative_path))
 
         self.assertEqual([], offenders)
 

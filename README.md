@@ -81,6 +81,8 @@ reports are treated as non-passing evidence.
 Corrupt or partially written scheduler JSON inputs are treated as missing or empty at
 scheduler boundaries, so paper timers fail closed and daily/weekly reports can
 regenerate instead of crashing.
+The read-only dashboard defaults to non-dry persisted paper reports; pass an explicit
+report or `dry_run=True` only for fixture previews.
 Malformed persisted filing dates are ignored for source freshness, and malformed option
 expiries are treated as unknown so health/report/exit timers keep evaluating remaining
 paper-risk controls.
