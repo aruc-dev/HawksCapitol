@@ -16,6 +16,7 @@ class ConfigAndRegistryTests(unittest.TestCase):
         self.assertEqual(cfg["mode"], "paper")
         self.assertFalse(cfg["execution"]["allow_live"])
         self.assertEqual(cfg["promotion"]["hcec2l_secret_id"], "hawkscapitol/live/keys")
+        self.assertNotIn("market_data_source", cfg["backtest"])
 
     def test_paid_source_cannot_be_enabled(self) -> None:
         cfg = load_config()

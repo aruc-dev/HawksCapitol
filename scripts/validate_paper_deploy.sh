@@ -3,11 +3,31 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-expected_remote="https://github.com/aruc-dev/HawksCapitol.git"
+normalize_github_remote() {
+  local remote_url="$1"
+  local remote_path="${remote_url}"
+  case "${remote_url}" in
+    https://github.com/*)
+      remote_path="${remote_url#https://github.com/}"
+      ;;
+    git@github.com:*)
+      remote_path="${remote_url#git@github.com:}"
+      ;;
+    ssh://git@github.com/*)
+      remote_path="${remote_url#ssh://git@github.com/}"
+      ;;
+  esac
+  remote_path="${remote_path%/}"
+  remote_path="${remote_path%.git}"
+  printf '%s\n' "${remote_path}"
+}
+
+expected_remote_slug="aruc-dev/HawksCapitol"
 actual_remote="$(git remote get-url origin)"
+actual_remote_slug="$(normalize_github_remote "${actual_remote}")"
 branch="$(git branch --show-current)"
 
-if [[ "${actual_remote}" != "${expected_remote}" ]]; then
+if [[ "${actual_remote_slug}" != "${expected_remote_slug}" ]]; then
   echo "unexpected origin remote: ${actual_remote}" >&2
   exit 1
 fi

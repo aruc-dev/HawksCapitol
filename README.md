@@ -86,6 +86,8 @@ report or `dry_run=True` only for fixture previews.
 Malformed persisted filing dates are ignored for source freshness, and malformed option
 expiries are treated as unknown so health/report/exit timers keep evaluating remaining
 paper-risk controls.
+Health checks warn when enabled-source rows fall below the configured
+`health.min_parse_confidence` threshold.
 Unreadable or malformed paper broker state is treated as empty on startup so scheduler
 health checks, scans, and reconciliation fail closed instead of crashing on a corrupt
 local state file.

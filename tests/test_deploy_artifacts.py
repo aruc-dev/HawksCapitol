@@ -165,7 +165,10 @@ class DeployArtifactTests(unittest.TestCase):
     def test_paper_deploy_validator_covers_local_safety_gates(self) -> None:
         text = (REPO_ROOT / "scripts" / "validate_paper_deploy.sh").read_text(encoding="utf-8")
 
-        self.assertIn("https://github.com/aruc-dev/HawksCapitol.git", text)
+        self.assertIn('expected_remote_slug="aruc-dev/HawksCapitol"', text)
+        self.assertIn("normalize_github_remote", text)
+        self.assertIn("git@github.com:", text)
+        self.assertIn("ssh://git@github.com/", text)
         self.assertIn('branch}" != "main"', text)
         self.assertIn('"mode"', text)
         self.assertIn("git ls-files", text)

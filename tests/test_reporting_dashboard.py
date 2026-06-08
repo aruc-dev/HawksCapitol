@@ -47,6 +47,29 @@ class ReportingDashboardTests(unittest.TestCase):
         self.assertEqual(status["house_clerk"]["row_count"], 2)
         self.assertIsNone(status["senate_efd"]["newest_filing_date"])
 
+    def test_health_check_flags_low_parse_confidence(self) -> None:
+        cfg = run_health_check.load_config()
+        registry = run_health_check.load_source_registry(cfg["source_registry_path"])
+        transactions = [
+            {"source": "house_clerk", "filing_date": "2026-06-04", "parse_confidence": 0.5},
+            {"source": "house_clerk", "filing_date": "2026-06-05", "parse_confidence": 0.95},
+        ]
+
+        status = run_health_check._source_status(cfg, registry, transactions, date(2026, 6, 8))
+        alerts = run_health_check._alerts(status, cfg)
+
+        self.assertEqual(status["house_clerk"]["low_parse_confidence_count"], 1)
+        self.assertIn(
+            {
+                "severity": "warning",
+                "source": "house_clerk",
+                "reason": "low_parse_confidence",
+                "count": 1,
+                "min_parse_confidence": cfg["health"]["min_parse_confidence"],
+            },
+            alerts,
+        )
+
     def test_health_check_reads_paper_broker_from_configured_data_dir(self) -> None:
         original_load_config = run_health_check.load_config
         try:
