@@ -7,10 +7,15 @@ Use this skill when building, reviewing, or deploying HawksCapitol.
 1. Read `architecture.md` for system behavior and invariants.
 2. Read `plan.md` for the current build phase and acceptance criteria.
 3. Run `bd ready` from `HawksCapitol/`, then claim or create a local issue.
-4. Make the smallest scoped implementation change that satisfies the issue.
-5. Add or update unit tests and validation tests in the same change.
-6. Run the full local validation required by `AGENTS.md`.
-7. Close the Beads issue only after validation is complete.
+4. Perform a documentation check before editing; decide whether `README.md`,
+   `TESTING.md`, `architecture.md`, `plan.md`, `AGENTS.md`, or files under `docs/`
+   must change with the work.
+5. Make the smallest scoped implementation change that satisfies the issue.
+6. Add or update unit tests and validation tests in the same change.
+7. Update affected documentation, or record a no-documentation-needed rationale in the
+   Beads close reason.
+8. Run the full local validation required by `AGENTS.md`.
+9. Close the Beads issue only after validation is complete.
 
 ## Non-Negotiable Invariants
 
@@ -19,6 +24,8 @@ Use this skill when building, reviewing, or deploying HawksCapitol.
 - Free-source compliance: official filings are source of truth; optional APIs must pass
   source-registry validation before production use.
 - Paper-first execution: live mode is blocked unless explicitly approved in-session.
+- Terraform-first AWS deployment: provision AWS from `infra/terraform`; do not fall back
+  to manual HawksTrade/HawksOptions-style deployment except for troubleshooting.
 - Independent exits: do not wait for late congressional sell filings to manage risk.
 - Risk integrity: sizing, stops, profit targets, and live promotion gates require human
   approval before material changes.
@@ -37,3 +44,5 @@ Required test classes by area:
 - `tests/test_backtest_*.py` for no-lookahead replay, reproducibility, and validation gates.
 
 Validation commands must be recorded in the Beads close reason or notes.
+Documentation checks and any documentation updates must also be recorded in the Beads
+close reason or notes.

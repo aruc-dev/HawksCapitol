@@ -1,0 +1,37 @@
+{
+  "buy_transactions": 1173,
+  "canonical_transactions": 2188,
+  "filing_date_end": "2026-06-04",
+  "filing_date_start": "2025-12-01",
+  "filings": 278,
+  "health": [
+    {
+      "message": "44 filings since 2025-12-01",
+      "newest_filing_date": "2026-01-16",
+      "ok": true,
+      "source": "house_clerk"
+    },
+    {
+      "message": "234 filings since 2025-12-01",
+      "newest_filing_date": "2026-06-04",
+      "ok": true,
+      "source": "house_clerk"
+    }
+  ],
+  "name": "official_house_6mo",
+  "notes": "Canonical transactions parsed from official House PTR PDFs. Raw PDFs remain untracked under data/raw/house_clerk/. Senate eFD is not included in this checked-in fixture.",
+  "pulled_on": "2026-06-08",
+  "raw_transactions": 2407,
+  "reconciliation_warnings": 143,
+  "source": "house_clerk",
+  "source_index_urls": [
+    "https://disclosures-clerk.house.gov/public_disc/financial-pdfs/2025FD.zip",
+    "https://disclosures-clerk.house.gov/public_disc/financial-pdfs/2026FD.zip"
+  ],
+  "source_owner": "U.S. House Office of the Clerk",
+  "with_ticker": 1944,
+  "years": [
+    2025,
+    2026
+  ]
+}

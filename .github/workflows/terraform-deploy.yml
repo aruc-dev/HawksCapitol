@@ -1,0 +1,67 @@
+name: Terraform AWS Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply the reviewed Terraform plan"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    name: Terraform paper deployment
+    runs-on: ubuntu-latest
+    environment: paper
+
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+
+      - name: Generate backend config
+        run: |
+          cat > backend.tf <<EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ vars.TF_STATE_BUCKET }}"
+              key            = "hawkscapitol/paper/terraform.tfstate"
+              region         = "${{ vars.AWS_REGION }}"
+              dynamodb_table = "${{ vars.TF_STATE_LOCK_TABLE }}"
+              encrypt        = true
+            }
+          }
+          EOF
+
+      - name: Terraform fmt
+        run: terraform fmt -check
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        if: ${{ inputs.apply == true || inputs.apply == 'true' }}
+        run: terraform apply -auto-approve tfplan

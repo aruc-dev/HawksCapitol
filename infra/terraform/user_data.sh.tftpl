@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec > >(tee -a /var/log/hawkscapitol-bootstrap.log) 2>&1
+
+repo_dir="/home/ec2-user/HawksCapitol"
+repo_url="${repository_url}"
+repo_ref="${repository_ref}"
+secret_id="${secret_id}"
+enable_timers="${enable_systemd_timers}"
+
+run_as_ec2() {
+  runuser -u ec2-user -- "$@"
+}
+
+dnf update -y
+dnf install -y git python3 python3-pip python3-virtualenv awscli
+
+install -d -m 0755 -o ec2-user -g ec2-user "$(dirname "$${repo_dir}")"
+if [[ ! -d "$${repo_dir}/.git" ]]; then
+  run_as_ec2 git clone "$${repo_url}" "$${repo_dir}"
+elif [[ -d "$${repo_dir}" ]]; then
+  chown -R ec2-user:ec2-user "$${repo_dir}"
+fi
+
+cd "$${repo_dir}"
+run_as_ec2 git -C "$${repo_dir}" fetch origin "$${repo_ref}"
+run_as_ec2 git -C "$${repo_dir}" checkout "$${repo_ref}"
+run_as_ec2 git -C "$${repo_dir}" reset --hard "origin/$${repo_ref}"
+
+run_as_ec2 bash -c 'cd "$1" && python3 -m venv .venv && . .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt' _ "$${repo_dir}"
+
+run_as_ec2 bash -c 'cd "$1" && . .venv/bin/activate && python3 -' _ "$${repo_dir}" <<'PY'
+from core.config_loader import load_config
+
+cfg = load_config()
+if cfg["mode"] != "paper":
+    raise SystemExit("Refusing to bootstrap non-paper HawksCapitol config")
+if cfg.get("execution", {}).get("allow_live"):
+    raise SystemExit("Refusing to bootstrap with execution.allow_live=true")
+PY
+
+install -d -m 0755 /etc/systemd/system
+cp scheduler/systemd/hawkscapitol-*.service /etc/systemd/system/
+cp scheduler/systemd/hawkscapitol-*.timer /etc/systemd/system/
+install -d -m 0755 /etc/systemd/system/hawkscapitol-secrets.service.d
+cat >/etc/systemd/system/hawkscapitol-secrets.service.d/10-terraform-secret.conf <<EOF
+[Service]
+Environment="HAWKSCAPITOL_SECRET_ID=$${secret_id}"
+EOF
+systemctl daemon-reload
+
+run_as_ec2 env HAWKSCAPITOL_SECRET_ID="$${secret_id}" HAWKSCAPITOL_DRY_RUN=1 "$${repo_dir}/scripts/fetch_secrets.sh"
+run_as_ec2 bash -c 'cd "$1" && . .venv/bin/activate && python3 -m unittest discover -v' _ "$${repo_dir}"
+run_as_ec2 bash -c 'cd "$1" && . .venv/bin/activate && python3 scheduler/run_health_check.py --dry-run' _ "$${repo_dir}"
+run_as_ec2 bash -c 'cd "$1" && . .venv/bin/activate && python3 scheduler/run_live_promotion_check.py --dry-run' _ "$${repo_dir}"
+
+systemctl enable hawkscapitol-secrets.service
+
+if [[ "$${enable_timers}" == "true" ]]; then
+  systemctl start hawkscapitol-secrets.service
+%{ for timer in systemd_timers ~}
+  systemctl enable --now ${timer}
+%{ endfor ~}
+else
+%{ for timer in systemd_timers ~}
+  systemctl enable ${timer}
+%{ endfor ~}
+fi
+
+systemctl list-timers 'hawkscapitol-*' --no-pager || true

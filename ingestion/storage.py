@@ -18,3 +18,13 @@ def read_json(path: str | Path, default: Any = None) -> Any:
     if not file_path.exists():
         return default
     return json.loads(file_path.read_text(encoding="utf-8"))
+
+
+def read_json_safe(path: str | Path, default: Any = None, expected_type: type | tuple[type, ...] | None = None) -> Any:
+    try:
+        payload = read_json(path, default)
+    except (OSError, ValueError):
+        return default
+    if expected_type is not None and not isinstance(payload, expected_type):
+        return default
+    return payload

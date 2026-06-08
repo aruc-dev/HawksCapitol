@@ -1,8 +1,9 @@
 # HawksCapitol Agent Instructions
 
-HawksCapitol is a paper-first congressional trade copy-trading system. It follows the
-HawksTrade operational pattern: Python, Alpaca, AWS EC2, systemd timers, AWS Secrets
-Manager, and tmpfs secrets.
+HawksCapitol is a paper-first congressional trade copy-trading system. Its AWS
+provisioning is Terraform-first, runnable from a laptop now and GitHub Actions later.
+The runtime still uses the Hawks family pattern: Python, Alpaca, AWS EC2, systemd
+timers, AWS Secrets Manager, and tmpfs secrets.
 
 ## Required Startup Checks
 
@@ -12,6 +13,9 @@ Manager, and tmpfs secrets.
 - Read `architecture.md`, `plan.md`, and `SKILL.md` for the current design and workflow.
 - Confirm `mode: paper` remains the default. Do not switch to live without explicit
   human approval in the current session.
+- Include a documentation check in the issue scope before editing: identify whether
+  `AGENTS.md`, `SKILL.md`, `README.md`, `TESTING.md`, `architecture.md`, `plan.md`, or
+  `docs/` need updates for the change.
 
 ## Absolute Rules
 
@@ -49,6 +53,25 @@ Additional validation is required by touched area:
 - Backtest changes: no-lookahead tests, reproducibility checks, benchmark comparisons.
 - Remote changes: verify services, timers, dry-runs/health checks, logs, and monitor
   for at least 10 minutes before closing.
+- Terraform/deploy changes: run or explicitly account for `scripts/validate_terraform.sh`,
+  verify no secret values are stored in Terraform state/examples, and document any
+  required AWS/GitHub Actions variables.
+
+## Documentation Check Required For Every Change
+
+Every change, including code, tests, deployment artifacts, configuration, and process
+updates, must include a documentation check before the Beads issue is closed.
+
+For each issue:
+
+- Update the affected documentation in the same change, or record a clear
+  no-documentation-needed rationale in the Beads close reason.
+- Keep agent/process docs current when workflow expectations change.
+- Keep `README.md`, `TESTING.md`, `architecture.md`, `plan.md`, and `docs/` aligned
+  with implemented behavior, scheduler commands, deployment requirements, and safety
+  gates.
+- Include documentation validation in the close reason, usually `git diff --check` plus
+  the focused docs contract tests when documentation rules or public commands change.
 
 ## Beads Workflow
 

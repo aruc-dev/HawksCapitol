@@ -1,0 +1,26 @@
+aws_region  = "us-east-1"
+environment = "paper"
+
+# Deploy only approved origin/main unless explicitly reviewed.
+repository_url = "https://github.com/aruc-dev/HawksCapitol.git"
+repository_ref = "main"
+
+instance_type       = "t3.micro"
+root_volume_size_gb = 30
+
+# Prefer SSM Session Manager. Add your current /32 only if SSH is required.
+allowed_ssh_cidr_blocks       = []
+dashboard_ingress_cidr_blocks = []
+ssh_key_name                  = ""
+
+# Terraform creates secret metadata only. Write secret values with AWS CLI/console so
+# credentials never enter Terraform state.
+secret_name            = "hawkscapitol/keys"
+existing_secret_arn    = ""
+
+# Keep false for the first apply. Set true after hawkscapitol/keys has paper values.
+enable_systemd_timers = false
+
+extra_tags = {
+  Owner = "replace-me"
+}

@@ -18,16 +18,19 @@ sell engine.
 ## 0. Conventions & Definition of Done
 
 - **Language/stack:** Python 3.10+, file-based persistence (CSV/JSON), Alpaca broker,
-  systemd on Amazon Linux 2023. Reuse HawksTrade modules wherever possible (port, don't
-  reinvent: `alpaca_client`, `order_executor`, `order_governor`, `risk_manager`,
+  Terraform-provisioned AWS, and systemd on Amazon Linux 2023. Reuse HawksTrade modules
+  wherever possible (port, don't reinvent: `alpaca_client`, `order_executor`,
+  `order_governor`, `risk_manager`,
   `correlation_guard`, `atr_sizing`, `exit_policy`, `live_mode_guard`, `config_loader`,
   `logging_config`).
 - **Every task is Done only when:** the change includes focused unit tests or an explicit
-  no-code-test rationale, validation tests pass, the relevant `scheduler/*.py --dry-run`
+  no-code-test rationale, documentation has been checked and updated or explicitly
+  marked not needed, validation tests pass, the relevant `scheduler/*.py --dry-run`
   runs clean, no secrets are logged, and the Beads issue is closed and pushed.
 - **Every change must be validated:** each Beads issue close reason must list the unit
-  tests and validation commands run. Remote paper/live changes require full service,
-  timer, dry-run/health, log, and monitoring validation before close.
+  tests, documentation check, and validation commands run. Remote paper/live changes
+  require full service, timer, dry-run/health, log, and monitoring validation before
+  close.
 - **Point-in-time rule (non-negotiable):** anything that decides *what was knowable when*
   must key off `filing_date`, never `tx_date`. A PR that violates this is rejected.
 - **Free sources only.** No paid feeds. No non-public data.
@@ -43,6 +46,9 @@ sell engine.
 
 Every implementation task must add or update tests in the same change. The only
 exception is a docs-only change, which must still run markdown/whitespace checks.
+Every implementation task must also perform a documentation check and update affected
+docs in the same change when behavior, commands, configuration, deployment, or workflow
+expectations change.
 
 | Change Area | Required Unit Tests | Required Validation |
 |---|---|---|
@@ -53,9 +59,10 @@ exception is a docs-only change, which must still run markdown/whitespace checks
 | Signal generation | freshness, entry-quality, blocked-reason, sizing, exposure cap tests | synthetic scan dry-run with no orders |
 | Sell/risk engine | each exit rule, priority order, stale-price behavior, alpha-decay stop | `run_risk_check.py --dry-run`; protective-exit log review |
 | Execution/broker | live-mode guard, order governor, idempotent client order IDs, reconciliation | Alpaca paper validation only; no live orders |
-| Backtesting | no-lookahead replay, reproducibility, benchmark comparisons | `run_backtest.py --days N`; report saved |
+| Backtesting | no-lookahead replay, reproducibility, price-history requirement, benchmark comparisons | `run_backtest.py --days N`; report saved |
 | Reporting/dashboard | report fixture tests, source freshness alerts, read-only dashboard tests | local dashboard smoke test / screenshot where applicable |
-| Systemd/deploy | unit rendering tests, env-path tests, timer naming tests | `daemon-reload`, service/timer status, logs, health, 10-minute monitor on remote |
+| Terraform/deploy | Terraform artifact tests, unit rendering tests, env-path tests, timer naming tests | `scripts/validate_terraform.sh`; `daemon-reload`, service/timer status, logs, health, 10-minute monitor on remote |
+| Documentation/process | docs contract tests when workflow/public commands change | documentation check recorded; `git diff --check` |
 
 Baseline commands:
 
@@ -268,14 +275,16 @@ Tasks
    HawksTrade slippage model); compound a paper portfolio.
 3. `backtest/metrics.py` — CAGR, Sharpe, max drawdown, hit rate, vs-SPY alpha, exposure,
    per-member/per-sector attribution.
-4. `scheduler/run_backtest.py --days N` + a validation gate (min sample size, min
-   Sharpe, drawdown ceiling) → `reports/`.
+4. `scheduler/run_backtest.py --days N` loads checked-in disclosure and Alpaca
+   price-history datasets, then applies a validation gate (min sample size, min Sharpe,
+   drawdown ceiling) → `reports/`.
 5. Baselines: compare against SPY, equal-weight copy-all, and no-entry-after-gap filters
    so the strategy must beat simpler alternatives before paper/live promotion.
 
 Acceptance
 - Lookahead guard test: injecting a future disclosure does **not** change a past day's
   decisions.
+- Non-dry-run backtests fail closed when the matching price-history dataset is missing.
 - Backtest over ≥3 years of history produces a metrics report; results saved & reproducible.
 - Validation gate yields a clear pass/watch/fail verdict.
 - Walk-forward split is documented; live promotion cannot rely on an in-sample-only pass.

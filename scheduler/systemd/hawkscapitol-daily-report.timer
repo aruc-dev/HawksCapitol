@@ -1,0 +1,10 @@
+[Unit]
+Description=Run HawksCapitol daily report after market close
+
+[Timer]
+Unit=hawkscapitol-daily-report.service
+OnCalendar=Mon..Fri *-*-* 22:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

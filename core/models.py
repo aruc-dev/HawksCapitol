@@ -18,7 +18,10 @@ def parse_date(value: str | date | datetime | None) -> date | None:
             return datetime.strptime(text, fmt).date()
         except ValueError:
             pass
-    return date.fromisoformat(text[:10])
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -69,6 +72,7 @@ class Transaction:
     filing_gap_pct: float | None = None
     dedup_key: str = ""
     raw_ref: str = ""
+    amends_doc_id: str | None = None
 
 
 @dataclass
@@ -105,6 +109,7 @@ class Position:
     exit_price: float | None = None
     realized_pnl: float | None = None
     exit_reason: str | None = None
+    option_meta: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -128,9 +133,16 @@ class MarketSnapshot:
     prices: dict[str, float]
     regime_ok: bool = True
     stale_symbols: set[str] = field(default_factory=set)
+    last_prices: dict[str, float] = field(default_factory=dict)
+    events: dict[str, set[str]] = field(default_factory=dict)
+    option_metrics: dict[str, dict[str, float]] = field(default_factory=dict)
 
     def price(self, ticker: str) -> float | None:
         return self.prices.get(ticker.upper())
+
+    def effective_price(self, ticker: str) -> float | None:
+        symbol = ticker.upper()
+        return self.prices.get(symbol) if symbol not in self.stale_symbols else self.last_prices.get(symbol, self.prices.get(symbol))
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,13 @@ from __future__ import annotations
 from core.models import Transaction
 
 
-def entry_quality_score(tx: Transaction, cfg: dict, earnings_blackout: bool = False, regime_ok: bool = True) -> tuple[float, str | None]:
+def entry_quality_score(
+    tx: Transaction,
+    cfg: dict,
+    earnings_blackout: bool = False,
+    corporate_action_blackout: bool = False,
+    regime_ok: bool = True,
+) -> tuple[float, str | None]:
     signals = cfg["signals"]
     if tx.ticker is None:
         return 0.0, "unresolved_ticker"
@@ -17,6 +23,8 @@ def entry_quality_score(tx: Transaction, cfg: dict, earnings_blackout: bool = Fa
         return 0.0, "large_filing_gap"
     if earnings_blackout:
         return 0.0, "earnings_blackout"
+    if corporate_action_blackout:
+        return 0.0, "corporate_action_blackout"
     if not regime_ok:
         return 0.0, "regime_block"
     lag_component = max(0.0, 1.0 - tx.filing_lag_days / signals["max_filing_lag_days"])

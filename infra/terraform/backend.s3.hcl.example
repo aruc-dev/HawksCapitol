@@ -1,0 +1,7 @@
+# Copy values into a generated backend file when moving from local laptop state to
+# GitHub Actions. Do not commit real bucket/table/account-specific values.
+bucket         = "REPLACE_WITH_TERRAFORM_STATE_BUCKET"
+key            = "hawkscapitol/paper/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "REPLACE_WITH_TERRAFORM_LOCK_TABLE"
+encrypt        = true

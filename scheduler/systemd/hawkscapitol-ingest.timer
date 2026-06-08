@@ -2,7 +2,8 @@
 Description=Run HawksCapitol ingest periodically
 
 [Timer]
-OnCalendar=*:0/180
+Unit=hawkscapitol-ingest.service
+OnCalendar=*-*-* 06,09,12,15,18:05:00
 Persistent=true
 
 [Install]

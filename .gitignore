@@ -14,8 +14,24 @@
 # Runtime data
 data/raw/
 data/archive/
+data/canonical/
+data/paper_broker/
+data/signals/
+data/trade_log.json
 logs/
+reports/alerts/
+reports/daily/
 reports/tmp/
+reports/weekly/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+backend.tf
+infra/terraform/terraform.tfvars
 
 # Python
 __pycache__/
