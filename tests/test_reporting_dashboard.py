@@ -31,6 +31,21 @@ class ReportingDashboardTests(unittest.TestCase):
         self.assertIn("senate_efd", stale_sources)
         self.assertTrue(payload["ok"])
 
+    def test_health_check_skips_malformed_filing_dates(self) -> None:
+        cfg = run_health_check.load_config()
+        registry = run_health_check.load_source_registry(cfg["source_registry_path"])
+        transactions = [
+            {"source": "house_clerk", "filing_date": "not-a-date"},
+            {"source": "house_clerk", "filing_date": "2026-06-04"},
+            {"source": "senate_efd", "filing_date": "bad-date"},
+        ]
+
+        status = run_health_check._source_status(cfg, registry, transactions, date(2026, 6, 8))
+
+        self.assertEqual(status["house_clerk"]["newest_filing_date"], "2026-06-04")
+        self.assertEqual(status["house_clerk"]["row_count"], 2)
+        self.assertIsNone(status["senate_efd"]["newest_filing_date"])
+
     def test_health_check_reads_paper_broker_from_configured_data_dir(self) -> None:
         original_load_config = run_health_check.load_config
         try:

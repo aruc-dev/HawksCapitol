@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from core.models import ExitDecision, MarketSnapshot, Position
+from core.models import ExitDecision, MarketSnapshot, Position, parse_date
 
 
 def evaluate_exit(position: Position, market: MarketSnapshot, cfg: dict, effective_tx_date: date, member_score: float = 1.0) -> ExitDecision | None:
@@ -49,8 +49,8 @@ def _evaluate_option_exit(position: Position, market: MarketSnapshot, exits: dic
     option_meta = position.option_meta or {}
     expiry_text = option_meta.get("expiry")
     if expiry_text:
-        expiry = date.fromisoformat(expiry_text)
-        if (expiry - market.as_of).days <= exits.get("min_option_dte_exit_days", 7):
+        expiry = parse_date(expiry_text)
+        if expiry and (expiry - market.as_of).days <= exits.get("min_option_dte_exit_days", 7):
             return ExitDecision(position.ticker, "option_time_to_expiry", "exit", price, 1)
     if price >= position.entry_price * (1 + exits.get("option_profit_target_pct", 0.5)):
         return ExitDecision(position.ticker, "option_profit_target", "exit", price, 2)

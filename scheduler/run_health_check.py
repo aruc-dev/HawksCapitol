@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from broker.paper_broker import PaperBroker
 from core.config_loader import load_config
+from core.models import parse_date
 from core.sample_data import sample_transactions
 from core.serialization import to_jsonable
 from core.source_registry import load_source_registry, validate_enabled_sources
@@ -47,7 +48,7 @@ def _source_status(cfg: dict, registry: dict, transactions: list[dict], as_of: d
     status = {}
     for name, entry in registry.items():
         rows = [tx for tx in transactions if tx.get("source") == name]
-        newest = max((date.fromisoformat(str(tx["filing_date"])[:10]) for tx in rows if tx.get("filing_date")), default=None)
+        newest = max((parsed for tx in rows if (parsed := parse_date(tx.get("filing_date"))) is not None), default=None)
         stale_days = (as_of - newest).days if newest else None
         status[name] = {
             "enabled": bool(cfg["sources"].get(name, False)),

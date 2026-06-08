@@ -59,6 +59,9 @@ back to demo data.
 Non-dry-run daily and weekly reports aggregate persisted runtime artifacts, such as
 latest signals, backtest output, risk decisions, and health status, instead of invoking
 dry-run fixture paths.
+Malformed persisted filing dates are ignored for source freshness, and malformed option
+expiries are treated as unknown so health/report/exit timers keep evaluating remaining
+paper-risk controls.
 
 ## AWS Deployment
 

@@ -123,12 +123,14 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         )
         profit = Position("opt-profit", "AAPL240821C200", "option", date(2026, 6, 1), 2.0, 1, 1.0, 10.0, 2.0, option_meta={"right": "call", "strike": 200.0, "expiry": "2026-08-21"})
         delta = Position("opt-delta", "AAPL240821C210", "option", date(2026, 6, 1), 2.0, 1, 1.0, 10.0, 2.0, option_meta={"right": "call", "strike": 210.0, "expiry": "2026-08-21"})
+        bad_expiry = Position("opt-bad-expiry", "AAPL240821C220", "option", date(2026, 6, 1), 2.0, 1, 1.0, 10.0, 2.0, option_meta={"right": "call", "strike": 220.0, "expiry": "not-a-date"})
         self.assertEqual(evaluate_positions([near_expiry], {"opt-time": date(2026, 6, 1)}, MarketSnapshot(as_of, {"AAPL240621C200": 2.1}), cfg)[0].reason, "option_time_to_expiry")
         self.assertEqual(evaluate_positions([profit], {"opt-profit": date(2026, 6, 1)}, MarketSnapshot(as_of, {"AAPL240821C200": 3.2}), cfg)[0].reason, "option_profit_target")
         self.assertEqual(
             evaluate_positions([delta], {"opt-delta": date(2026, 6, 1)}, MarketSnapshot(as_of, {"AAPL240821C210": 2.1}, option_metrics={"AAPL240821C210": {"delta": 0.05}}), cfg)[0].reason,
             "option_delta_decay",
         )
+        self.assertEqual(evaluate_positions([bad_expiry], {"opt-bad-expiry": date(2026, 6, 1)}, MarketSnapshot(as_of, {"AAPL240821C220": 3.2}), cfg)[0].reason, "option_profit_target")
 
     def test_paper_broker_idempotency_and_governor(self) -> None:
         broker = PaperBroker()
