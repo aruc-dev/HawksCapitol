@@ -17,7 +17,7 @@ from core.broker_stops import sync_protective_stops
 from core.order_executor import execute_signal
 from core.order_governor import OrderGovernor
 from core.sample_data import sample_as_of, sample_sector_map, sample_transactions
-from ingestion.storage import read_json
+from ingestion.storage import read_json, write_json
 from scheduler import reconcile_trade_log, run_backtest as run_backtest_scheduler, run_scan
 from engine.copy_signal import build_copy_signals
 from engine.sell_engine import evaluate_positions
@@ -146,34 +146,91 @@ class RiskExecutionBacktestTests(unittest.TestCase):
             governor.check(Order("next", "MSFT", "buy", 1), 10)
 
     def test_paper_broker_persists_and_scan_retries_do_not_duplicate(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            state_path = Path(tmp) / "paper_state.json"
-            trade_log_path = Path(tmp) / "trade_log.json"
-            signals_path = Path(tmp) / "signals.json"
-            broker = PaperBroker(state_path)
-            order = Order("same", "AAPL", "buy", 10, limit_price=50.0)
-            broker.submit(order)
-            self.assertEqual(PaperBroker(state_path).submit(order).client_order_id, "same")
-            self.assertEqual(len(read_json(state_path)["orders"]), 1)
+        original_scan_load_config = run_scan.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = load_config()
+                cfg["data_dir"] = str(Path(tmp) / "runtime-data")
+                run_scan.load_config = lambda: cfg
+                write_json(Path(cfg["data_dir"]) / "canonical" / "transactions.json", sample_transactions())
 
-            first = run_scan.run(
-                dry_run=False,
-                broker_state_path=state_path,
-                trade_log_path=trade_log_path,
-                signals_path=signals_path,
-            )
-            second = run_scan.run(
-                dry_run=False,
-                broker_state_path=state_path,
-                trade_log_path=trade_log_path,
-                signals_path=signals_path,
-            )
-            state = read_json(state_path)
-            self.assertEqual(len({row["client_order_id"] for row in state["orders"]}), len(state["orders"]))
-            self.assertEqual(len(first["accepted_orders"]), len(second["accepted_orders"]))
-            self.assertTrue(read_json(signals_path))
-            reconciliation = reconcile_trade_log.run(dry_run=True, broker_state_path=state_path, trade_log_path=trade_log_path)
-            self.assertEqual(reconciliation["missing_in_broker"], [])
+                state_path = Path(tmp) / "paper_state.json"
+                trade_log_path = Path(tmp) / "trade_log.json"
+                signals_path = Path(tmp) / "signals.json"
+                broker = PaperBroker(state_path)
+                order = Order("same", "AAPL", "buy", 10, limit_price=50.0)
+                broker.submit(order)
+                self.assertEqual(PaperBroker(state_path).submit(order).client_order_id, "same")
+                self.assertEqual(len(read_json(state_path)["orders"]), 1)
+
+                first = run_scan.run(
+                    dry_run=False,
+                    broker_state_path=state_path,
+                    trade_log_path=trade_log_path,
+                    signals_path=signals_path,
+                    as_of=sample_as_of(),
+                )
+                second = run_scan.run(
+                    dry_run=False,
+                    broker_state_path=state_path,
+                    trade_log_path=trade_log_path,
+                    signals_path=signals_path,
+                    as_of=sample_as_of(),
+                )
+                state = read_json(state_path)
+                self.assertEqual(len({row["client_order_id"] for row in state["orders"]}), len(state["orders"]))
+                self.assertEqual(len(first["accepted_orders"]), len(second["accepted_orders"]))
+                self.assertTrue(read_json(signals_path))
+                reconciliation = reconcile_trade_log.run(dry_run=True, broker_state_path=state_path, trade_log_path=trade_log_path)
+                self.assertEqual(reconciliation["missing_in_broker"], [])
+        finally:
+            run_scan.load_config = original_scan_load_config
+
+    def test_non_dry_scan_uses_canonical_transactions_without_sample_fallback(self) -> None:
+        original_scan_load_config = run_scan.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = load_config()
+                cfg["data_dir"] = str(Path(tmp) / "runtime-data")
+                run_scan.load_config = lambda: cfg
+                tx = sample_transactions()[0]
+                canonical_only = tx.__class__(
+                    **{
+                        **tx.__dict__,
+                        "tx_id": "canonical-only",
+                        "doc_id": "canonical-doc",
+                        "ticker": "XOM",
+                        "asset_name_raw": "Exxon Mobil Corp",
+                    }
+                )
+                write_json(Path(cfg["data_dir"]) / "canonical" / "transactions.json", [canonical_only])
+
+                result = run_scan.run(dry_run=False, as_of=sample_as_of())
+
+                self.assertEqual(len(result["signals"]), 1)
+                self.assertEqual(result["signals"][0]["source_tx_ids"], ["canonical-only"])
+                self.assertEqual(result["accepted_orders"], [])
+        finally:
+            run_scan.load_config = original_scan_load_config
+
+    def test_non_dry_scan_missing_canonical_data_fails_closed(self) -> None:
+        original_scan_load_config = run_scan.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = load_config()
+                cfg["data_dir"] = str(Path(tmp) / "runtime-data")
+                run_scan.load_config = lambda: cfg
+                data_dir = Path(cfg["data_dir"])
+
+                result = run_scan.run(dry_run=False, as_of=sample_as_of())
+
+                self.assertEqual(result["signals"], [])
+                self.assertEqual(result["accepted_orders"], [])
+                self.assertEqual(read_json(data_dir / "signals" / "latest.json"), [])
+                self.assertEqual(read_json(data_dir / "trade_log.json"), [])
+                self.assertFalse((data_dir / "paper_broker" / "state.json").exists())
+        finally:
+            run_scan.load_config = original_scan_load_config
 
     def test_scan_and_reconcile_use_configured_data_dir_by_default(self) -> None:
         original_scan_load_config = run_scan.load_config
@@ -184,8 +241,9 @@ class RiskExecutionBacktestTests(unittest.TestCase):
                 cfg["data_dir"] = str(Path(tmp) / "custom-data")
                 run_scan.load_config = lambda: cfg
                 reconcile_trade_log.load_config = lambda: cfg
+                write_json(Path(cfg["data_dir"]) / "canonical" / "transactions.json", sample_transactions())
 
-                run_scan.run(dry_run=False)
+                run_scan.run(dry_run=False, as_of=sample_as_of())
                 reconciliation = reconcile_trade_log.run(dry_run=True)
 
                 data_dir = Path(cfg["data_dir"])

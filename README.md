@@ -49,6 +49,14 @@ scripts/validate_paper_deploy.sh
 The default config is `mode: paper`. Live execution is blocked unless explicitly
 approved in-session and configured in `config/config.yaml`.
 
+## Runtime Data Safety
+
+`scheduler/run_scan.py --dry-run` uses fixture transactions for local validation.
+Without `--dry-run`, the scan reads canonical transactions from
+`<data_dir>/canonical/transactions.json` and the sector map from `config/sectors.json`;
+missing canonical transactions produce no signals or paper orders rather than falling
+back to demo data.
+
 ## AWS Deployment
 
 HawksCapitol is Terraform-first for AWS deployment:
