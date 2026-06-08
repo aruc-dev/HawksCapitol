@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec > >(tee -a /var/log/hawkscapitol-bootstrap.log) 2>&1
+
+repo_dir="/home/ec2-user/HawksCapitol"
+repo_url="${repository_url}"
+repo_ref="${repository_ref}"
+secret_name="${secret_name}"
+enable_timers="${enable_systemd_timers}"
+
+dnf update -y
+dnf install -y git python3 python3-pip python3-virtualenv awscli
+
+if [[ ! -d "$${repo_dir}/.git" ]]; then
+  git clone "$${repo_url}" "$${repo_dir}"
+fi
+
+cd "$${repo_dir}"
+git fetch origin "$${repo_ref}"
+git checkout "$${repo_ref}"
+git reset --hard "origin/$${repo_ref}"
+
+python3 -m venv .venv
+. .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+python3 - <<'PY'
+from core.config_loader import load_config
+
+cfg = load_config()
+if cfg["mode"] != "paper":
+    raise SystemExit("Refusing to bootstrap non-paper HawksCapitol config")
+if cfg.get("execution", {}).get("allow_live"):
+    raise SystemExit("Refusing to bootstrap with execution.allow_live=true")
+PY
+
+install -d -m 0755 /etc/systemd/system
+cp scheduler/systemd/hawkscapitol-*.service /etc/systemd/system/
+cp scheduler/systemd/hawkscapitol-*.timer /etc/systemd/system/
+systemctl daemon-reload
+
+HAWKSCAPITOL_SECRET_ID="$${secret_name}" HAWKSCAPITOL_DRY_RUN=1 scripts/fetch_secrets.sh
+python3 -m unittest discover -v
+python3 scheduler/run_health_check.py --dry-run
+python3 scheduler/run_live_promotion_check.py --dry-run
+
+systemctl enable hawkscapitol-secrets.service
+
+if [[ "$${enable_timers}" == "true" ]]; then
+  systemctl start hawkscapitol-secrets.service
+%{ for timer in systemd_timers ~}
+  systemctl enable --now ${timer}
+%{ endfor ~}
+else
+%{ for timer in systemd_timers ~}
+  systemctl enable ${timer}
+%{ endfor ~}
+fi
+
+systemctl list-timers 'hawkscapitol-*' --no-pager || true

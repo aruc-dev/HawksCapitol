@@ -22,6 +22,8 @@ def execute_signal(signal: Signal, broker, cfg: dict, price: float, governor: Or
     assert_live_allowed(cfg, human_approved=human_approved)
     if signal.blocked_reason:
         return OrderResult(f"hc-{signal.signal_id}", signal.ticker, signal.side, 0, "blocked", signal.blocked_reason)
+    if signal.asset_type == "option" and not cfg.get("execution", {}).get("options_enabled", False):
+        return OrderResult(f"hc-{signal.signal_id}", signal.ticker, signal.side, 0, "blocked", "options_disabled")
     order = order_from_signal(signal, cfg["risk"]["account_equity"], price)
     governor.check(order, price)
     result = broker.submit(order)

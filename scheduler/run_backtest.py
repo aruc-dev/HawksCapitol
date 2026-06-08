@@ -14,7 +14,7 @@ from ingestion.storage import write_json
 
 def run(dry_run: bool = False, days: int = 365) -> dict:
     cfg = load_config()
-    result = run_backtest(sample_transactions(), cfg, sample_sector_map(), sample_as_of())
+    result = run_backtest(sample_transactions(), cfg, sample_sector_map(), sample_as_of(), days=days)
     result["days"] = days
     if not dry_run:
         write_json("reports/backtest/latest.json", result)

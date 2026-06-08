@@ -1,0 +1,10 @@
+[Unit]
+Description=Run HawksCapitol weekly report
+
+[Timer]
+Unit=hawkscapitol-weekly-report.service
+OnCalendar=Fri *-*-* 23:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

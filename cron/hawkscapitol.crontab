@@ -1,0 +1,12 @@
+SHELL=/bin/bash
+HAWKSCAPITOL_HOME=/path/to/HawksCapitol
+HAWKSCAPITOL_ENV_FILE=/dev/shm/.hawkscapitol.env
+
+# Development parity schedule. Production uses scheduler/systemd/.
+5 6,9,12,15,18 * * 1-5 cd "$HAWKSCAPITOL_HOME" && set -a && . "$HAWKSCAPITOL_ENV_FILE" && set +a && python3 scheduler/run_ingest.py >> logs/cron.log 2>&1
+15 2 * * * cd "$HAWKSCAPITOL_HOME" && set -a && . "$HAWKSCAPITOL_ENV_FILE" && set +a && python3 scheduler/run_score.py >> logs/cron.log 2>&1
+5 14,16,18,20 * * 1-5 cd "$HAWKSCAPITOL_HOME" && set -a && . "$HAWKSCAPITOL_ENV_FILE" && set +a && python3 scheduler/run_scan.py >> logs/cron.log 2>&1
+*/15 14-21 * * 1-5 cd "$HAWKSCAPITOL_HOME" && set -a && . "$HAWKSCAPITOL_ENV_FILE" && set +a && python3 scheduler/run_risk_check.py >> logs/cron.log 2>&1
+15 22 * * 1-5 cd "$HAWKSCAPITOL_HOME" && set -a && . "$HAWKSCAPITOL_ENV_FILE" && set +a && python3 scheduler/run_report.py >> logs/cron.log 2>&1
+0 23 * * 5 cd "$HAWKSCAPITOL_HOME" && set -a && . "$HAWKSCAPITOL_ENV_FILE" && set +a && python3 scheduler/run_weekly_report.py >> logs/cron.log 2>&1
+*/10 * * * * cd "$HAWKSCAPITOL_HOME" && set -a && . "$HAWKSCAPITOL_ENV_FILE" && set +a && python3 scheduler/run_health_check.py >> logs/cron.log 2>&1

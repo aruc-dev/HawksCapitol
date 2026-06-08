@@ -1,0 +1,10 @@
+[Unit]
+Description=Run HawksCapitol risk checks during market hours
+
+[Timer]
+Unit=hawkscapitol-risk-check.service
+OnCalendar=Mon..Fri *-*-* 14..21:0/15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

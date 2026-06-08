@@ -1,0 +1,10 @@
+[Unit]
+Description=Run HawksCapitol scan during market hours
+
+[Timer]
+Unit=hawkscapitol-scan.service
+OnCalendar=Mon..Fri *-*-* 14,16,18,20:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

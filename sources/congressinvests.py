@@ -1,18 +1,66 @@
 from __future__ import annotations
 
 from datetime import date
+import os
 
 from sources.base import RawFiling, SourceHealth
+from sources.fmp import _normalize_row
+
+
+CONGRESSINVESTS_ENDPOINT = "https://api.congressinvests.com/trades"
 
 
 class CongressInvestsSource:
     name = "congressinvests"
 
+    def __init__(self, api_key: str | None = None, fixture_payload: list[dict] | None = None, session=None, endpoint: str = CONGRESSINVESTS_ENDPOINT) -> None:
+        self.api_key = api_key or os.getenv("CONGRESSINVESTS_API_KEY")
+        self.fixture_payload = fixture_payload
+        self.session = session
+        self.endpoint = endpoint
+        self._last_health = SourceHealth(self.name, False, message="disabled until terms and free limits are verified")
+
     def fetch(self, since: date) -> list[RawFiling]:
-        return []
+        if self.fixture_payload is not None:
+            filings = self._filings_from_rows(self.fixture_payload, since)
+            self._last_health = SourceHealth(self.name, True, max((f.filing_date for f in filings), default=None), "fixture")
+            return filings
+        if not self.api_key:
+            self._last_health = SourceHealth(self.name, False, message="missing reviewed free API key; self-disabled")
+            return []
+        session = self.session or _requests_session()
+        response = session.get(self.endpoint, headers={"Authorization": f"Bearer {self.api_key}"}, timeout=30)
+        if response.status_code in {401, 402, 403, 429}:
+            self._last_health = SourceHealth(self.name, False, message=f"entitlement/quota unavailable: HTTP {response.status_code}")
+            return []
+        if response.status_code != 200:
+            self._last_health = SourceHealth(self.name, False, message=f"HTTP {response.status_code}")
+            return []
+        rows = response.json()
+        filings = self._filings_from_rows(rows if isinstance(rows, list) else rows.get("data", []), since)
+        self._last_health = SourceHealth(self.name, True, max((f.filing_date for f in filings), default=None), f"{len(filings)} rows")
+        return filings
 
     def parse(self, raw: RawFiling) -> list[dict]:
-        return raw.payload if isinstance(raw.payload, list) else []
+        rows = raw.payload if isinstance(raw.payload, list) else [raw.payload] if isinstance(raw.payload, dict) else []
+        return [_normalize_row(raw, row) for row in rows]
 
     def health(self) -> SourceHealth:
-        return SourceHealth(self.name, False, message="disabled until terms and free limits are verified")
+        return self._last_health
+
+    def _filings_from_rows(self, rows: list[dict], since: date) -> list[RawFiling]:
+        filings = []
+        for idx, row in enumerate(rows):
+            filing_date = date.fromisoformat(str(row.get("filing_date") or row.get("filingDate") or row.get("disclosureDate"))[:10])
+            if filing_date < since:
+                continue
+            doc_id = str(row.get("doc_id") or row.get("documentId") or f"ci-{idx}")
+            member = row.get("member_name") or row.get("representative") or row.get("senator") or "Unknown"
+            filings.append(RawFiling(self.name, doc_id, member, filing_date, payload=row))
+        return filings
+
+
+def _requests_session():
+    import requests
+
+    return requests.Session()

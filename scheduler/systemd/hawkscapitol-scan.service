@@ -1,0 +1,15 @@
+[Unit]
+Description=HawksCapitol scan for paper copy-buy entries
+Wants=network-online.target
+Requires=hawkscapitol-secrets.service
+After=network-online.target hawkscapitol-secrets.service
+
+[Service]
+Type=oneshot
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/HawksCapitol
+Environment=HAWKSCAPITOL_ENV_FILE=/dev/shm/.hawkscapitol.env
+Environment=HAWKSCAPITOL_REQUIRE_SHM=1
+EnvironmentFile=/dev/shm/.hawkscapitol.env
+ExecStart=/home/ec2-user/HawksCapitol/.venv/bin/python scheduler/run_scan.py

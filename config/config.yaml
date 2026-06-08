@@ -23,7 +23,10 @@
     "min_entry_quality_score": 0.50,
     "max_filing_lag_days": 60,
     "max_filing_gap_pct": 0.25,
-    "cluster_window_days": 30
+    "cluster_window_days": 30,
+    "allowed_asset_types": ["stock"],
+    "min_adv_dollars": 0,
+    "max_spread_pct": 0.05
   },
   "exits": {
     "stop_loss_pct": 0.08,
@@ -32,7 +35,10 @@
     "trailing_stop_pct": 0.08,
     "max_alpha_age_days": 60,
     "max_hold_days": 90,
-    "conviction_drop_exit_score": 0.30
+    "conviction_drop_exit_score": 0.30,
+    "min_option_dte_exit_days": 7,
+    "option_profit_target_pct": 0.50,
+    "min_option_delta_abs": 0.15
   },
   "sources": {
     "house_clerk": true,
@@ -47,5 +53,19 @@
     "allow_live": false,
     "require_human_live_approval": true,
     "options_enabled": false
+  },
+  "promotion": {
+    "required_backtest_verdict": "pass",
+    "min_paper_weeks": 4,
+    "min_paper_trades": 20,
+    "min_paper_hit_rate": 0.50,
+    "max_paper_drawdown_pct": 0.08,
+    "require_origin_main": true,
+    "expected_origin": "https://github.com/aruc-dev/HawksCapitol.git",
+    "hcec2l_secret_id": "hawkscapitol/live/keys"
+  },
+  "health": {
+    "max_source_staleness_days": 7,
+    "min_parse_confidence": 0.75
   }
 }

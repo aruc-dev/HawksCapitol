@@ -1,9 +1,9 @@
 # HawksCapitol — System Architecture
 
 **Project:** HawksCapitol — Congressional Trade Copy-Trading System
-**Status:** Design (pre-implementation)
+**Status:** Implemented locally; production-paper-ready pending HCEC2P remote deployment
 **Owner:** Arun
-**Last updated:** 2026-06-07
+**Last updated:** 2026-06-08
 **Sibling systems:** HawksTrade (equities/crypto swing bot), HawksOptions (options bot)
 
 > HawksCapitol is the third member of the Hawks family. It periodically ingests U.S.
@@ -15,9 +15,9 @@
 > engine** (profit targets, trailing stops, alpha-decay timers, and signal-based
 > exits).
 
-This document is written to be **self-sufficient for an AI agent to implement the
-entire system** from scratch. It pairs with [`plan.md`](./plan.md), which sequences
-the build into phases with acceptance criteria.
+This document is written to be **self-sufficient for an AI agent to understand,
+maintain, deploy, and extend the system**. It pairs with [`plan.md`](./plan.md), which
+sequences the build into phases with acceptance criteria.
 
 ---
 
@@ -34,7 +34,7 @@ the build into phases with acceptance criteria.
    filing — using profit targets, trailing stops, alpha-decay time limits, stop
    losses, and event-driven exits.
 5. **Execute** on Alpaca, **paper by default**, live only on explicit human approval,
-   mirroring the HawksTrade operational pattern (EC2 + systemd + AWS Secrets Manager).
+   with Terraform-provisioned AWS infrastructure plus systemd and AWS Secrets Manager.
 6. **Backtest** copy strategies with strict point-in-time discipline (no lookahead).
 7. **Report & monitor** via daily/weekly reports, health checks, and a read-only dashboard.
 8. **Prove source eligibility** before implementation: every automated source must be
@@ -391,7 +391,7 @@ buys are the strongest signal).
         └──────────────────┘
 ```
 
-### 7.2 Proposed repository layout (mirrors HawksTrade)
+### 7.2 Repository layout (mirrors HawksTrade)
 ```
 HawksCapitol/
 ├── AGENTS.md  SKILL.md                            # required local agent workflow files
@@ -406,18 +406,21 @@ HawksCapitol/
 │   └── .env.example           # API keys (Alpaca; optional free API keys only)
 ├── docs/
 │   ├── sources.md             # rendered source eligibility and terms notes
-│   └── scoring.md             # score formulas, PIT invariants, validation gates
+│   ├── scoring.md             # score formulas, PIT invariants, validation gates
+│   ├── backtesting.md         # replay semantics and validation gates
+│   ├── live_promotion.md      # HCEC2L promotion criteria and approval workflow
+│   └── hardening_backlog.md   # Phase 10 follow-up Beads and blockers
 ├── sources/                   # DisclosureSource adapters
 │   ├── base.py                # DisclosureSource interface
-│   ├── house_clerk.py  senate_efd.py  fmp.py  finnhub.py  stock_watcher.py
+│   ├── house_clerk.py  senate_efd.py  fmp.py  congressinvests.py
+│   ├── stock_watcher.py  history_loader.py  committee_memberships.py
 │   └── ticker_resolver.py
 ├── ingestion/
 │   ├── fetcher.py  pdf_parser.py  ocr.py  normalizer.py  reconciler.py  dedupe.py
 ├── core/                      # reused/ported from HawksTrade where possible
 │   ├── alpaca_client.py  broker_interface.py  order_executor.py  order_governor.py
-│   ├── risk_manager.py  correlation_guard.py  atr_sizing.py  portfolio.py
-│   ├── exit_policy.py  protection_manager.py  live_mode_guard.py
-│   ├── config_loader.py  logging_config.py  trading_models.py  version.py
+│   ├── risk_manager.py  portfolio.py  broker_stops.py  live_promotion.py
+│   ├── exit_policy.py  live_mode_guard.py  config_loader.py  models.py
 ├── analytics/
 │   ├── member_score.py  sector_heatmap.py  alpha_decay.py
 ├── engine/
@@ -429,12 +432,13 @@ HawksCapitol/
 │   ├── simulator.py  metrics.py
 ├── scheduler/                 # entrypoints invoked by systemd timers
 │   ├── run_ingest.py  run_score.py  run_scan.py  run_risk_check.py
-│   ├── run_report.py  run_backtest.py  run_health_check.py  reconcile_trade_log.py
+│   ├── run_report.py  run_weekly_report.py  run_backtest.py
+│   ├── run_health_check.py  run_live_promotion_check.py  reconcile_trade_log.py
 │   ├── systemd/   launchd/   cron/    # unit + timer files per platform
 ├── scripts/
 │   ├── fetch_secrets.sh       # AWS Secrets Manager → /dev/shm/.hawkscapitol.env
-│   └── seed_history.py
-├── dashboard/                 # read-only Flask status UI + Cloudflare tunnel
+│   └── validate_paper_deploy.sh
+├── dashboard/                 # read-only dashboard renderer + optional Flask app
 ├── data/  (raw/ canonical/ universe/ archive/)   reports/  logs/
 └── tests/
 ```
@@ -459,10 +463,12 @@ class Broker(Protocol):              # Alpaca impl; paper/live via base_url + gu
 
 ---
 
-## 8. Operations (mirrors HawksTrade exactly)
+## 8. Operations
 
 ### 8.1 Stack
 - **OS:** Amazon Linux 2023 (EC2) · **Language:** Python 3.10+
+- **Provisioning:** Terraform root module under `infra/terraform` for laptop-driven
+  deploys now and GitHub Actions deploys later
 - **Scheduler:** systemd services + timers (cron/launchd provided for dev parity)
 - **Secrets:** AWS Secrets Manager → materialized to **tmpfs `/dev/shm/.hawkscapitol.env`**
   at boot by `scripts/fetch_secrets.sh`; `HAWKSCAPITOL_REQUIRE_SHM=1` fails closed in prod.
@@ -475,10 +481,13 @@ class Broker(Protocol):              # Alpaca impl; paper/live via base_url + gu
 | `HCEC2P` | HawksCapitol EC2 **Paper** |
 | `HCEC2L` | HawksCapitol EC2 **Live** |
 
-The `deploy <instance>` workflow, status/log commands, and verification requirements
-follow the operations root `CLAUDE.md` verbatim (resolve alias → inspect remote →
-deploy `origin/main` only → align systemd units → daemon-reload → validate → monitor
-≥10 min). Live deploys are `origin/main` only.
+The `HCEC2P` paper instance is provisioned by Terraform. Terraform outputs the EC2
+instance ID, public DNS/IP, secret ARN, timer list, and SSM Session Manager command.
+Live deploys remain `origin/main` only and require explicit human approval.
+
+The repo-side HCEC2P readiness gate is `scripts/validate_paper_deploy.sh`. Actual
+HCEC2P deployment requires reviewed `terraform plan`, `terraform apply`, secret value
+creation outside Terraform, and explicit paper deployment approval.
 
 ### 8.3 Scheduled jobs (systemd timers, prefix `hawkscapitol-*`)
 | Timer | Cadence (suggested) | Job |
@@ -498,9 +507,13 @@ Secrets job ordered `Before` all trading jobs; trading jobs `Requires`/`After` s
 ### 8.4 Verification (before any task is "Done")
 1. `python3 -m unittest discover -v` green.
 2. Relevant scheduler script runs clean with `--dry-run` (no orders placed).
-3. `/dev/shm/.hawkscapitol.env` present if secrets touched.
-4. No new errors in `journalctl`.
-5. On any remote (paper/live) change: validate services, timers, dry-runs/health, logs.
+3. Documentation check completed: affected docs updated, or a no-doc-needed rationale
+   recorded in the Beads close reason.
+4. `scripts/validate_terraform.sh` green for deployment changes.
+5. `/dev/shm/.hawkscapitol.env` present if secrets touched.
+6. No new errors in `journalctl`.
+7. On any remote (paper/live) change: validate services, timers, dry-runs/health, logs,
+   and monitor for at least 10 minutes.
 
 ### 8.5 Workflow / tracking (Beads)
 New repo gets its own Beads tracker. Per operations-root routing: changes inside
@@ -541,6 +554,8 @@ restricted to approved `origin/main`.
 - **Security** — least-privilege IAM (read-only Secrets Manager, scoped to
   `hawkscapitol/*`), tmpfs secrets, never logging keys, read-only dashboard behind a
   tunnel.
+- **Documentation discipline** — every change includes a documentation check; workflow,
+  command, deployment, config, and behavior changes update docs in the same issue.
 
 ---
 
@@ -554,7 +569,7 @@ restricted to approved `origin/main`.
 | Exits | **Independent intelligent-sell engine** | Member sell filings are too late to mirror. |
 | Sizing | **Conviction × freshness, ATR risk, ranges not mirrored** | Disclosed amounts are coarse ranges, not actionable dollar figures. |
 | Storage | **CSV/JSON files** | Matches Hawks family; DB-ready schema if scale demands. |
-| Ops | **EC2 + systemd + AWS Secrets Manager + tmpfs** | Identical to HawksTrade for operational consistency. |
+| Ops | **Terraform + EC2 + systemd + AWS Secrets Manager + tmpfs** | Terraform owns AWS provisioning; runtime remains Hawks-family style. |
 
 ---
 
@@ -573,6 +588,7 @@ restricted to approved `origin/main`.
 - **Chasing already-priced moves** — many trades will be public only after the market
   has moved. *Mitigation:* entry-quality and filing-gap filters block stale/FOMO entries.
 - **ETF sparsity** — ETFs largely exempt from PTRs, so ETF copy signals will be thin.
-- **Open items for the user:** target account size & per-trade risk %; live-promotion
-  criteria (min backtested Sharpe / sample size); notification channel (email/Slack);
-  whether to also short on disclosed sells (default: **no** in v1).
+- **Open items for the user:** HCEC2P SSH host mapping and paper deploy approval;
+  notification channel (email/Slack); future risk/scoring threshold changes after
+  realized paper evidence; whether to also short on disclosed sells (default: **no** in
+  v1).

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run HawksCapitol health check frequently
+
+[Timer]
+Unit=hawkscapitol-health-check.service
+OnCalendar=*-*-* *:0/10:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

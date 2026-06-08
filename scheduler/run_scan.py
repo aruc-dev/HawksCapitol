@@ -17,7 +17,12 @@ from engine.copy_signal import build_copy_signals
 from ingestion.storage import write_json
 
 
-def run(dry_run: bool = False) -> dict:
+def run(
+    dry_run: bool = False,
+    broker_state_path: str | Path = "data/paper_broker/state.json",
+    trade_log_path: str | Path = "data/trade_log.json",
+    signals_path: str | Path = "data/signals/latest.json",
+) -> dict:
     cfg = load_config()
     txs = sample_transactions()
     as_of = sample_as_of()
@@ -25,13 +30,13 @@ def run(dry_run: bool = False) -> dict:
     signals = build_copy_signals(txs, scores, cfg, sample_sector_map(), as_of)
     accepted = []
     if not dry_run:
-        broker = PaperBroker()
+        broker = PaperBroker(broker_state_path)
         governor = OrderGovernor(cfg["risk"]["max_daily_orders"], cfg["risk"]["account_equity"] * cfg["risk"]["max_position_pct"])
         for sig in signals:
             if not sig.blocked_reason:
                 accepted.append(execute_signal(sig, broker, cfg, price=100.0, governor=governor))
-        write_json("data/signals/latest.json", signals)
-        write_json("data/trade_log.json", accepted)
+        write_json(signals_path, signals)
+        write_json(trade_log_path, accepted)
     return {"signals": to_jsonable(signals), "accepted_orders": to_jsonable(accepted)}
 
 

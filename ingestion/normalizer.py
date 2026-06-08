@@ -29,6 +29,25 @@ def classify_asset_type(asset_name: str, option_meta: dict | None = None) -> str
     return "stock"
 
 
+def parse_option_meta(asset_name: str) -> dict | None:
+    text = asset_name or ""
+    right_match = re.search(r"\b(call|put)\b", text, flags=re.IGNORECASE)
+    if not right_match:
+        return None
+    strike_match = re.search(r"\$?(\d+(?:\.\d+)?)\s+(?:call|put)\b", text, flags=re.IGNORECASE)
+    if not strike_match:
+        strike_match = re.search(r"\b(?:call|put)\b.*?(?:strike\s*)?\$?(\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
+    if not strike_match:
+        return None
+    expiry_match = re.search(r"\b(\d{1,2}/\d{1,2}/\d{4}|\d{1,2}/\d{1,2}/\d{2}|\d{4}-\d{2}-\d{2})\b", text)
+    expiry = parse_date(expiry_match.group(1)) if expiry_match else None
+    return {
+        "right": right_match.group(1).lower(),
+        "strike": float(strike_match.group(1)),
+        "expiry": expiry.isoformat() if expiry else None,
+    }
+
+
 def normalize_tx_type(value: str) -> str:
     text = (value or "").lower()
     if "purchase" in text or "buy" in text:
@@ -58,7 +77,8 @@ def normalize_record(record: dict, resolver: TickerResolver | None = None) -> tu
     amount_min, amount_max, amount_mid = parse_amount_range(record.get("amount") or record.get("amount_range") or "")
     tx_type = normalize_tx_type(record.get("tx_type") or record.get("transaction_type") or record.get("type") or "")
     asset_name = record.get("asset_name") or record.get("asset") or record.get("asset_name_raw") or ticker or "Unknown"
-    asset_type = classify_asset_type(asset_name, record.get("option_meta"))
+    option_meta = record.get("option_meta") or parse_option_meta(asset_name)
+    asset_type = classify_asset_type(asset_name, option_meta)
     price_tx = record.get("price_on_tx_date")
     price_filing = record.get("price_on_filing_date")
     filing_gap_pct = None
@@ -74,7 +94,7 @@ def normalize_record(record: dict, resolver: TickerResolver | None = None) -> tu
         ingested_at=datetime.now(UTC),
         url=record.get("url", ""),
         parse_confidence=float(record.get("parse_confidence", 1.0)),
-        amends_doc_id=record.get("amends_doc_id"),
+        amends_doc_id=record.get("amends_doc_id") or record.get("amended_doc_id") or record.get("amends"),
     )
     tx = Transaction(
         tx_id=str(record.get("tx_id") or dedup_key),
@@ -93,13 +113,14 @@ def normalize_record(record: dict, resolver: TickerResolver | None = None) -> tu
         source=record.get("source", "unknown"),
         source_quality=record.get("source_quality", "official"),
         parse_confidence=float(record.get("parse_confidence", 1.0)),
-        option_meta=record.get("option_meta"),
+        option_meta=option_meta,
         filing_lag_days=lag,
         price_on_tx_date=float(price_tx) if price_tx else None,
         price_on_filing_date=float(price_filing) if price_filing else None,
         filing_gap_pct=filing_gap_pct,
         dedup_key=dedup_key,
         raw_ref=record.get("raw_ref", ""),
+        amends_doc_id=record.get("amends_doc_id") or record.get("amended_doc_id") or record.get("amends"),
     )
     return disclosure, tx
 
