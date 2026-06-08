@@ -12,7 +12,7 @@ from analytics.member_score import compute_member_scores
 from broker.paper_broker import PaperBroker
 from core.config_loader import load_config
 from core.live_mode_guard import LiveModeBlocked, assert_live_allowed
-from core.live_promotion import PromotionEvidence, evaluate_live_promotion
+from core.live_promotion import PromotionEvidence, evaluate_live_promotion, normalize_github_remote
 from core.models import MarketSnapshot, Order, Position
 from core.broker_stops import sync_protective_stops
 from core.order_executor import execute_signal
@@ -396,6 +396,22 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         )
         self.assertTrue(approved["eligible"])
         self.assertEqual(approved["next_step"], "manual_live_change_review")
+
+        ssh_origin = evaluate_live_promotion(
+            cfg,
+            PromotionEvidence(
+                backtest_verdict="pass",
+                paper_weeks=4,
+                paper_trades=20,
+                paper_hit_rate=0.55,
+                paper_max_drawdown_pct=0.04,
+                origin_remote="git@github.com:aruc-dev/HawksCapitol.git",
+                branch="main",
+                human_approved=True,
+            ),
+        )
+        self.assertTrue(ssh_origin["eligible"])
+        self.assertEqual(normalize_github_remote("ssh://git@github.com/aruc-dev/HawksCapitol"), "aruc-dev/HawksCapitol")
 
         wrong_ref = evaluate_live_promotion(
             cfg,

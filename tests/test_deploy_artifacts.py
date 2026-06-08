@@ -94,6 +94,24 @@ class DeployArtifactTests(unittest.TestCase):
         self.assertNotEqual(blocked.returncode, 0)
         self.assertIn("refusing to write secrets outside /dev/shm", blocked.stderr)
 
+        traversal_env = os.environ.copy()
+        traversal_env.update(
+            {
+                "HAWKSCAPITOL_DRY_RUN": "1",
+                "HAWKSCAPITOL_REQUIRE_SHM": "1",
+                "HAWKSCAPITOL_ENV_FILE": "/dev/shm/../tmp/hc-test.env",
+            }
+        )
+        traversal = subprocess.run(
+            ["bash", "scripts/fetch_secrets.sh"],
+            cwd=REPO_ROOT,
+            env=traversal_env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(traversal.returncode, 0)
+        self.assertIn("refusing to write secrets outside /dev/shm", traversal.stderr)
+
         with tempfile.NamedTemporaryFile() as handle:
             Path(handle.name).chmod(stat.S_IRUSR | stat.S_IWUSR)
             validate_env = os.environ.copy()

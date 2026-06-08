@@ -15,6 +15,24 @@ class PromotionEvidence:
     human_approved: bool = False
 
 
+def normalize_github_remote(remote: str | None) -> str:
+    if not remote:
+        return ""
+    value = remote.strip().rstrip("/")
+    if value.endswith(".git"):
+        value = value[:-4]
+    prefixes = (
+        "https://github.com/",
+        "http://github.com/",
+        "ssh://git@github.com/",
+        "git@github.com:",
+    )
+    for prefix in prefixes:
+        if value.startswith(prefix):
+            return value[len(prefix):]
+    return value
+
+
 def evaluate_live_promotion(cfg: dict, evidence: PromotionEvidence) -> dict:
     promotion = cfg.get("promotion", {})
     reasons: list[str] = []
@@ -40,7 +58,7 @@ def evaluate_live_promotion(cfg: dict, evidence: PromotionEvidence) -> dict:
     if promotion.get("require_origin_main", True):
         if evidence.branch != "main":
             reasons.append("deployment_branch_not_main")
-        if expected_origin and evidence.origin_remote != expected_origin:
+        if expected_origin and normalize_github_remote(evidence.origin_remote) != normalize_github_remote(expected_origin):
             reasons.append("deployment_origin_mismatch")
     if not evidence.human_approved:
         reasons.append("explicit_human_live_approval_missing")

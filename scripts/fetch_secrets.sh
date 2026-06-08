@@ -8,6 +8,15 @@ dry_run="${HAWKSCAPITOL_DRY_RUN:-0}"
 validate_only="${HAWKSCAPITOL_VALIDATE_ONLY:-0}"
 aws_cli="${AWS_CLI:-aws}"
 
+canonical_target="$(python3 - "${target}" <<'PY'
+from pathlib import Path
+import sys
+
+print(Path(sys.argv[1]).expanduser().resolve(strict=False))
+PY
+)"
+target="${canonical_target}"
+
 if [[ "${require_shm}" == "1" && "${target}" != /dev/shm/* ]]; then
   echo "refusing to write secrets outside /dev/shm when HAWKSCAPITOL_REQUIRE_SHM=1" >&2
   exit 1

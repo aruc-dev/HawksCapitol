@@ -133,8 +133,10 @@ sudo -u ec2-user HAWKSCAPITOL_REQUIRE_SHM=1 scripts/fetch_secrets.sh
 sudo -u ec2-user HAWKSCAPITOL_VALIDATE_ONLY=1 scripts/fetch_secrets.sh
 ```
 
-Expected target: `/dev/shm/.hawkscapitol.env` with `0600` permissions. The script logs
-only paths and secret IDs, never secret values.
+Expected target: `/dev/shm/.hawkscapitol.env` with `0600` permissions. With
+`HAWKSCAPITOL_REQUIRE_SHM=1`, the script canonicalizes the target path before enforcing
+the `/dev/shm` boundary, so path traversal cannot redirect secrets outside tmpfs. The
+script logs only paths and secret IDs, never secret values.
 
 ## Manual systemd Install Fallback
 

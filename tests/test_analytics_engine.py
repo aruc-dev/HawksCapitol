@@ -56,6 +56,30 @@ class AnalyticsEngineTests(unittest.TestCase):
         self.assertEqual(curve.samples[90], 0)
         self.assertAlmostEqual(curve.horizon_alpha[30], 0.08)
 
+    def test_alpha_decay_curve_uses_nearest_trading_days(self) -> None:
+        _, txs = normalize_records([
+            {
+                "doc_id": "weekend-end",
+                "source": "house_clerk",
+                "member_name": "Curve Member",
+                "filing_date": "2026-01-05",
+                "tx_date": "2026-01-02",
+                "ticker": "AAPL",
+                "asset_name": "Apple",
+                "tx_type": "Purchase",
+                "amount": "$1,001 - $15,000",
+            },
+        ])
+        prices = {
+            "AAPL": {date(2026, 1, 2): 100.0, date(2026, 1, 30): 112.0},
+            "SPY": {date(2026, 1, 2): 100.0, date(2026, 1, 30): 103.0},
+        }
+
+        curve = compute_alpha_decay_curve(txs, prices, date(2026, 2, 2), horizons=(30,))
+
+        self.assertEqual(curve.samples[30], 1)
+        self.assertAlmostEqual(curve.horizon_alpha[30], 0.09)
+
     def test_member_score_uses_only_visible_filings_and_sparse_guard(self) -> None:
         _, txs = normalize_records([
             {

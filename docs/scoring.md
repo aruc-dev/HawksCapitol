@@ -12,8 +12,10 @@ HawksCapitol scoring is point-in-time:
 
 Alpha-decay curves are computed only from closed historical buy episodes. A trade is
 eligible for a horizon only when its `filing_date` is visible as of the score date and
-the full forward window has completed by that same as-of date. `freshness_score` then
-discounts copy entries from `tx_date`, with optional curve-derived max positive age.
+the full forward window has completed by that same as-of date. Returns use the nearest
+available trading days inside the requested window, so weekend/holiday horizons do not
+drop otherwise valid samples. `freshness_score` then discounts copy entries from
+`tx_date`, with optional curve-derived max positive age.
 
 Member scores combine sample quality, PIT hit rate, closed-window realized alpha,
 filing latency, disclosed amount tier, parse quality, and sector concentration. When

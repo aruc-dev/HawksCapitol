@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from core.models import Transaction
+from core.price_history import window_return
 
 
 @dataclass(frozen=True)
@@ -42,19 +43,15 @@ def compute_alpha_decay_curve(
         if tx.tx_type != "buy" or tx.filing_date > as_of or not tx.ticker:
             continue
         symbol_prices = price_history.get(tx.ticker.upper(), {})
-        entry_price = symbol_prices.get(tx.tx_date)
-        benchmark_entry = benchmark_prices.get(tx.tx_date)
-        if not entry_price or not benchmark_entry:
-            continue
         for horizon in horizons:
             end_date = tx.tx_date + timedelta(days=horizon)
             if end_date > as_of:
                 continue
-            end_price = symbol_prices.get(end_date)
-            benchmark_end = benchmark_prices.get(end_date)
-            if not end_price or not benchmark_end:
+            symbol_return = window_return(symbol_prices, tx.tx_date, end_date)
+            benchmark_return = window_return(benchmark_prices, tx.tx_date, end_date)
+            if symbol_return is None or benchmark_return is None:
                 continue
-            alpha = ((end_price - entry_price) / entry_price) - ((benchmark_end - benchmark_entry) / benchmark_entry)
+            alpha = symbol_return - benchmark_return
             totals[horizon] += alpha
             samples[horizon] += 1
     horizon_alpha = {

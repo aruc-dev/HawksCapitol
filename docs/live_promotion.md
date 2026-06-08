@@ -37,6 +37,9 @@ python3 scheduler/run_live_promotion_check.py --dry-run \
 Even after the evidence gate passes, live orders remain blocked until a human explicitly
 approves the session and the live config is changed intentionally. The runtime live guard
 still requires both `execution.allow_live=true` and an in-session approval flag.
+The origin check normalizes equivalent GitHub remote URL forms, including HTTPS and SSH
+remotes with or without the `.git` suffix, before comparing against the configured
+expected repository.
 
 ## HCEC2L Readiness
 
