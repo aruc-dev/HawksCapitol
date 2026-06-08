@@ -100,6 +100,12 @@ class SourcesAndIngestionTests(unittest.TestCase):
         _, txs = normalize_records(rows, TickerResolver())
         self.assertEqual(txs[0].ticker, "AAPL")
         self.assertEqual(txs[0].tx_type, "buy")
+        raw_pdf_text, raw_pdf_confidence = extract_text_from_pdf_bytes(b"%PDF-1.4\n1 0 obj << /Type /Catalog >>\nendobj\n%%EOF")
+        self.assertNotIn("%PDF", raw_pdf_text)
+        self.assertLess(raw_pdf_confidence, 0.8)
+        plain_text, plain_confidence = extract_text_from_pdf_bytes(b"Transaction Date | Asset | Ticker\n2026-05-01 | Apple Inc. | AAPL")
+        self.assertIn("Apple Inc.", plain_text)
+        self.assertEqual(plain_confidence, 0.8)
 
     def test_house_source_parses_fixture_pdf_and_ingest_source_dry_run(self) -> None:
         xml = """
