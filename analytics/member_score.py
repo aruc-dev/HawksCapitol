@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from core.models import MemberScore, Transaction
+from core.price_history import window_return
 
 
 def compute_member_scores(
@@ -81,14 +82,12 @@ def _closed_alpha(
             values.append(None)
             continue
         symbol_prices = price_history.get(tx.ticker.upper(), {})
-        start = symbol_prices.get(tx.tx_date)
-        end = symbol_prices.get(end_date)
-        bench_start = benchmark_prices.get(tx.tx_date)
-        bench_end = benchmark_prices.get(end_date)
-        if not start or not end or not bench_start or not bench_end:
+        symbol_return = window_return(symbol_prices, tx.tx_date, end_date)
+        benchmark_return = window_return(benchmark_prices, tx.tx_date, end_date)
+        if symbol_return is None or benchmark_return is None:
             values.append(None)
             continue
-        values.append(((end - start) / start) - ((bench_end - bench_start) / bench_start))
+        values.append(symbol_return - benchmark_return)
     return values
 
 

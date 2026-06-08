@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from analytics.member_score import compute_member_scores
 from backtest.metrics import compute_metrics
 from backtest.pit_replay import visible_transactions
+from core.price_history import window_return
 from engine.copy_signal import build_copy_signals
 
 
@@ -27,6 +28,8 @@ def run_backtest(
     seen_signals: set[str] = set()
     price_history = price_history or {}
     price_history_supplied = bool(price_history)
+    missing_price_returns = 0
+    periods_per_year = _effective_periods_per_year(eligible_dates)
     for current in eligible_dates:
         visible = visible_transactions(transactions, current)
         scores = compute_member_scores(visible, current, price_history=price_history, sector_map=sector_map)
@@ -39,11 +42,14 @@ def run_backtest(
             tx = _tx_for_signal(visible, signal.source_tx_ids[0])
             if tx is None:
                 continue
-            return_pct = _estimate_return(tx, price_history, current, as_of)
+            return_pct = _estimate_return(tx, price_history, current, as_of, allow_fallback=not price_history_supplied)
+            seen_signals.add(signal.signal_id)
+            if return_pct is None:
+                missing_price_returns += 1
+                continue
             pnl_pct = signal.target_weight_pct * return_pct
             day_pnl += equity[-1] * pnl_pct
             day_exposure += signal.target_weight_pct
-            seen_signals.add(signal.signal_id)
             trades.append(
                 {
                     "signal_id": signal.signal_id,
@@ -58,9 +64,11 @@ def run_backtest(
             )
         equity.append(max(0.0, equity[-1] + day_pnl))
         exposures.append(day_exposure)
-        benchmark.append(benchmark[-1] * (1 + _benchmark_return(price_history, current, as_of)))
-    metrics = compute_metrics(equity, benchmark, trades, exposures)
-    baselines = _baselines(transactions, cfg, as_of)
+        benchmark_return = _benchmark_return(price_history, current, as_of, allow_fallback=not price_history_supplied)
+        benchmark.append(benchmark[-1] * (1 + (benchmark_return or 0.0)))
+    metrics = compute_metrics(equity, benchmark, trades, exposures, periods_per_year=periods_per_year)
+    baselines = _baselines(transactions, cfg, as_of, start_date, price_history)
+    metrics["vs_benchmark"] = round(metrics["total_return"] - baselines["spy"]["total_return"], 6)
     validation = validate_backtest(metrics, baselines)
     return {
         "signals": len(trades),
@@ -72,6 +80,8 @@ def run_backtest(
         "market_data": {
             "price_history_supplied": price_history_supplied,
             "return_model": "price_history_30d_returns" if price_history_supplied else "simulator_fallback_returns",
+            "missing_price_returns": missing_price_returns,
+            "periods_per_year": round(periods_per_year, 6),
         },
         "walk_forward": {
             "train_fraction": 0.7,
@@ -100,6 +110,15 @@ def validate_backtest(metrics: dict, baselines: dict) -> dict:
     return {"verdict": verdict, "reason": reason}
 
 
+def _effective_periods_per_year(eligible_dates: list[date]) -> float:
+    if len(eligible_dates) < 2:
+        return 252.0
+    elapsed_days = (eligible_dates[-1] - eligible_dates[0]).days
+    if elapsed_days <= 0:
+        return 252.0
+    return max(1.0, len(eligible_dates) / (elapsed_days / 365.25))
+
+
 def _tx_for_signal(transactions, tx_id: str):
     for tx in transactions:
         if tx.tx_id == tx_id:
@@ -107,33 +126,53 @@ def _tx_for_signal(transactions, tx_id: str):
     return None
 
 
-def _estimate_return(tx, price_history: dict[str, dict[date, float]], current: date, as_of: date) -> float:
+def _estimate_return(
+    tx,
+    price_history: dict[str, dict[date, float]],
+    current: date,
+    as_of: date,
+    allow_fallback: bool = True,
+) -> float | None:
     prices = price_history.get((tx.ticker or "").upper(), {})
-    start = prices.get(current) or tx.price_on_filing_date
     end_date = min(as_of, current + timedelta(days=30))
-    end = prices.get(end_date)
-    if start and end:
-        return (end - start) / start
+    realized = window_return(prices, current, end_date)
+    if realized is not None:
+        return realized
+    if not allow_fallback:
+        return None
     if tx.filing_gap_pct is not None:
         return max(-0.05, min(0.05, tx.filing_gap_pct / 10))
     return 0.005
 
 
-def _benchmark_return(price_history: dict[str, dict[date, float]], current: date, as_of: date) -> float:
+def _benchmark_return(
+    price_history: dict[str, dict[date, float]],
+    current: date,
+    as_of: date,
+    allow_fallback: bool = True,
+) -> float | None:
     prices = price_history.get("SPY", {})
-    start = prices.get(current)
-    end = prices.get(min(as_of, current + timedelta(days=30)))
-    if start and end:
-        return (end - start) / start
+    realized = window_return(prices, current, min(as_of, current + timedelta(days=30)))
+    if realized is not None:
+        return realized
+    if not allow_fallback:
+        return None
     return 0.001
 
 
-def _baselines(transactions, cfg, as_of: date) -> dict:
+def _baselines(
+    transactions,
+    cfg,
+    as_of: date,
+    start_date: date,
+    price_history: dict[str, dict[date, float]] | None = None,
+) -> dict:
     visible = [tx for tx in transactions if tx.filing_date <= as_of and tx.tx_type == "buy"]
+    spy_return = window_return((price_history or {}).get("SPY", {}), start_date, as_of)
     copy_all_return = 0.003 * len(visible)
     no_gap_count = sum(1 for tx in visible if tx.filing_gap_pct is None or abs(tx.filing_gap_pct) <= cfg["signals"]["max_filing_gap_pct"])
     return {
-        "spy": {"total_return": 0.001},
+        "spy": {"total_return": round(spy_return if spy_return is not None else 0.001, 6)},
         "equal_weight_copy_all": {"total_return": round(copy_all_return, 6), "signals": len(visible)},
         "no_entry_after_gap": {"total_return": round(0.004 * no_gap_count, 6), "signals": no_gap_count},
     }

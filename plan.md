@@ -59,7 +59,7 @@ expectations change.
 | Signal generation | freshness, entry-quality, blocked-reason, sizing, exposure cap tests | synthetic scan dry-run with no orders |
 | Sell/risk engine | each exit rule, priority order, stale-price behavior, alpha-decay stop | `run_risk_check.py --dry-run`; protective-exit log review |
 | Execution/broker | live-mode guard, order governor, idempotent client order IDs, reconciliation | Alpaca paper validation only; no live orders |
-| Backtesting | no-lookahead replay, reproducibility, benchmark comparisons | `run_backtest.py --days N`; report saved |
+| Backtesting | no-lookahead replay, reproducibility, price-history requirement, benchmark comparisons | `run_backtest.py --days N`; report saved |
 | Reporting/dashboard | report fixture tests, source freshness alerts, read-only dashboard tests | local dashboard smoke test / screenshot where applicable |
 | Terraform/deploy | Terraform artifact tests, unit rendering tests, env-path tests, timer naming tests | `scripts/validate_terraform.sh`; `daemon-reload`, service/timer status, logs, health, 10-minute monitor on remote |
 | Documentation/process | docs contract tests when workflow/public commands change | documentation check recorded; `git diff --check` |
@@ -275,14 +275,16 @@ Tasks
    HawksTrade slippage model); compound a paper portfolio.
 3. `backtest/metrics.py` — CAGR, Sharpe, max drawdown, hit rate, vs-SPY alpha, exposure,
    per-member/per-sector attribution.
-4. `scheduler/run_backtest.py --days N` + a validation gate (min sample size, min
-   Sharpe, drawdown ceiling) → `reports/`.
+4. `scheduler/run_backtest.py --days N` loads checked-in disclosure and Alpaca
+   price-history datasets, then applies a validation gate (min sample size, min Sharpe,
+   drawdown ceiling) → `reports/`.
 5. Baselines: compare against SPY, equal-weight copy-all, and no-entry-after-gap filters
    so the strategy must beat simpler alternatives before paper/live promotion.
 
 Acceptance
 - Lookahead guard test: injecting a future disclosure does **not** change a past day's
   decisions.
+- Non-dry-run backtests fail closed when the matching price-history dataset is missing.
 - Backtest over ≥3 years of history produces a metrics report; results saved & reproducible.
 - Validation gate yields a clear pass/watch/fail verdict.
 - Walk-forward split is documented; live promotion cannot rely on an in-sample-only pass.

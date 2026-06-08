@@ -5,7 +5,9 @@
   "data_dir": "data",
   "reports_dir": "reports",
   "backtest": {
-    "dataset_path": "data/backtest/official_house_6mo/transactions.json"
+    "dataset_path": "data/backtest/official_house_6mo/transactions.json",
+    "price_history_path": "data/backtest/official_house_6mo/prices.json",
+    "market_data_source": "alpaca_market_data"
   },
   "risk": {
     "account_equity": 100000.0,

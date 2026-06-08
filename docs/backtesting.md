@@ -40,12 +40,20 @@ python3 scheduler/run_backtest.py --dry-run --dataset path/to/transactions.json
 
 ## Market Data Limitation
 
-The checked-in dataset contains official disclosure transactions only. It does not
-include approved historical market-price data. Until a reviewed free market-data source
-or Alpaca paper market-data export is added, reports with
-`market_data.price_history_supplied=false` use the simulator fallback return model.
-Those results are useful for replay/gating validation, but they are not price-realized
-performance.
+Real-data backtests require an Alpaca market-data export at
+`data/backtest/official_house_6mo/prices.json`. Refresh it with Alpaca paper
+credentials set in the environment:
+
+```bash
+APCA_API_KEY_ID=... APCA_API_SECRET_KEY=... python3 scripts/fetch_backtest_prices.py
+```
+
+The export stores adjusted daily closes for stock buy tickers plus `SPY`; commit the
+generated `prices.json` with the matching transaction dataset. Non-dry-run
+`scheduler/run_backtest.py` fails closed when this file is missing or does not include
+`SPY`, so `reports/backtest/latest.json` is not produced from simulator fallback
+returns. Dry-run sample runs still report `market_data.price_history_supplied=false`
+and use the deterministic fallback model for CI fixture validation only.
 
 The default validation gate reports `pass`, `watch`, or `fail`. Live promotion cannot
 use an in-sample result alone: the report includes a walk-forward split note, and paper

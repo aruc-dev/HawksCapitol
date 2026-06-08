@@ -26,9 +26,11 @@ Run the checked-in real-data backtest and write `reports/backtest/latest.json`:
 python3 scheduler/run_backtest.py --days 186
 ```
 
-The checked-in real-data backtest currently uses official House disclosure data plus
-the simulator fallback return model unless a report shows
-`market_data.price_history_supplied=true`.
+The real-data command requires `data/backtest/official_house_6mo/prices.json`.
+Refresh it with `python3 scripts/fetch_backtest_prices.py` when Alpaca paper credentials
+are available in the environment, then commit it with the matching transaction dataset.
+Without that price file, non-dry-run backtesting fails closed instead of writing a
+fallback-return report.
 
 Validate Terraform deployment artifacts:
 

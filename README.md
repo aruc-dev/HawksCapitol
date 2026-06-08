@@ -58,10 +58,12 @@ default to the checked-in official House Clerk dataset at
 2025-12-01 through 2026-06-04. The latest generated report is written to
 `reports/backtest/latest.json`.
 
-The checked-in dataset contains official disclosure transactions only. Until approved
-historical market-price data is added, reports with
-`market_data.price_history_supplied=false` use the simulator fallback return model
-rather than price-realized returns.
+Real-data backtests also require the matching Alpaca market-data export at
+`data/backtest/official_house_6mo/prices.json`. Refresh it with
+`python3 scripts/fetch_backtest_prices.py` when Alpaca paper credentials are available
+in the environment. Non-dry-run backtests fail closed if that price file is missing, so
+`reports/backtest/latest.json` is not produced from simulator fallback returns. Dry-run
+sample runs still use the deterministic fallback model for fixture validation.
 
 ## Runtime Data Safety
 
@@ -76,6 +78,9 @@ dry-run fixture paths.
 Malformed persisted filing dates are ignored for source freshness, and malformed option
 expiries are treated as unknown so health/report/exit timers keep evaluating remaining
 paper-risk controls.
+Unreadable or malformed paper broker state is treated as empty on startup so scheduler
+health checks, scans, and reconciliation fail closed instead of crashing on a corrupt
+local state file.
 
 ## AWS Deployment
 

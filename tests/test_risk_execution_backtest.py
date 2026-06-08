@@ -16,11 +16,36 @@ from core.models import MarketSnapshot, Order, Position
 from core.broker_stops import sync_protective_stops
 from core.order_executor import execute_signal
 from core.order_governor import OrderGovernor
+from core.price_history import window_return
 from core.sample_data import sample_as_of, sample_sector_map, sample_transactions
 from ingestion.storage import read_json, write_json
 from scheduler import reconcile_trade_log, run_backtest as run_backtest_scheduler, run_scan
 from engine.copy_signal import build_copy_signals
 from engine.sell_engine import evaluate_positions
+
+
+def _sample_price_history() -> dict[str, dict[date, float]]:
+    return {
+        "AAPL": {date(2026, 6, 1): 100.0, date(2026, 6, 3): 100.0, date(2026, 6, 7): 110.0},
+        "MSFT": {date(2026, 6, 2): 100.0, date(2026, 6, 3): 100.0, date(2026, 6, 7): 105.0},
+        "NVDA": {date(2026, 6, 3): 100.0, date(2026, 6, 7): 90.0},
+        "SPY": {
+            date(2026, 6, 1): 100.0,
+            date(2026, 6, 2): 101.0,
+            date(2026, 6, 3): 102.0,
+            date(2026, 6, 7): 103.0,
+        },
+    }
+
+
+def _sample_price_history_payload() -> dict:
+    return {
+        "source": "test",
+        "prices": {
+            symbol: {day.isoformat(): close for day, close in series.items()}
+            for symbol, series in _sample_price_history().items()
+        },
+    }
 
 
 class RiskExecutionBacktestTests(unittest.TestCase):
@@ -146,6 +171,18 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         governor.record()
         with self.assertRaises(ValueError):
             governor.check(Order("next", "MSFT", "buy", 1), 10)
+
+    def test_paper_broker_corrupt_state_fails_closed_to_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_path = Path(tmp) / "state.json"
+            state_path.write_text("{bad json", encoding="utf-8")
+
+            broker = PaperBroker(state_path)
+
+            self.assertEqual(broker.positions(), [])
+            result = broker.submit(Order("after-corrupt", "AAPL", "buy", 1, limit_price=100.0))
+            self.assertEqual(result.status, "accepted")
+            self.assertEqual(read_json(state_path)["orders"][0]["client_order_id"], "after-corrupt")
 
     def test_paper_broker_persists_and_scan_retries_do_not_duplicate(self) -> None:
         original_scan_load_config = run_scan.load_config
@@ -345,6 +382,44 @@ class RiskExecutionBacktestTests(unittest.TestCase):
             self.assertIn(key, result["metrics"])
         self.assertIn(result["validation"]["verdict"], {"pass", "watch", "fail"})
         self.assertIn("spy", result["baselines"])
+        self.assertFalse(result["market_data"]["price_history_supplied"])
+        self.assertEqual(result["market_data"]["return_model"], "simulator_fallback_returns")
+
+    def test_price_history_window_uses_nearest_trading_days(self) -> None:
+        series = {date(2026, 6, 2): 100.0, date(2026, 6, 5): 110.0}
+        self.assertEqual(window_return(series, date(2026, 6, 1), date(2026, 6, 7)), 0.10)
+        self.assertIsNone(window_return(series, date(2026, 6, 6), date(2026, 6, 7)))
+
+    def test_backtest_uses_supplied_price_history_without_fallback(self) -> None:
+        cfg = load_config()
+        result = run_backtest(
+            sample_transactions(),
+            cfg,
+            sample_sector_map(),
+            sample_as_of(),
+            price_history=_sample_price_history(),
+        )
+
+        self.assertTrue(result["market_data"]["price_history_supplied"])
+        self.assertEqual(result["market_data"]["return_model"], "price_history_30d_returns")
+        self.assertEqual(result["market_data"]["missing_price_returns"], 0)
+        self.assertIn(0.1, {trade["return_pct"] for trade in result["trades"]})
+        self.assertEqual(result["baselines"]["spy"]["total_return"], 0.03)
+        self.assertEqual(result["metrics"]["vs_benchmark"], round(result["metrics"]["total_return"] - 0.03, 6))
+
+    def test_backtest_skips_missing_price_returns_when_price_history_supplied(self) -> None:
+        cfg = load_config()
+        result = run_backtest(
+            sample_transactions(),
+            cfg,
+            sample_sector_map(),
+            sample_as_of(),
+            price_history={"SPY": _sample_price_history()["SPY"]},
+        )
+
+        self.assertTrue(result["market_data"]["price_history_supplied"])
+        self.assertEqual(result["signals"], 0)
+        self.assertEqual(result["market_data"]["missing_price_returns"], 3)
 
     def test_cagr_uses_return_period_count(self) -> None:
         metrics = compute_metrics([100.0, 110.0], periods_per_year=252)
@@ -378,6 +453,27 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         self.assertEqual(verdict["verdict"], "watch")
         self.assertEqual(verdict["reason"], "strategy has not beaten benchmark curve")
 
+    def test_backtest_metrics_use_elapsed_filing_date_periods(self) -> None:
+        cfg = load_config()
+        txs = [
+            tx.__class__(
+                **{
+                    **tx.__dict__,
+                    "tx_id": f"period-{idx}",
+                    "doc_id": f"period-{idx}",
+                    "filing_date": filing_date,
+                }
+            )
+            for idx, (tx, filing_date) in enumerate(
+                zip(sample_transactions(), [date(2026, 1, 1), date(2026, 4, 1), date(2026, 6, 1)])
+            )
+        ]
+
+        result = run_backtest(txs, cfg, sample_sector_map(), date(2026, 6, 1), days=365)
+
+        expected = round(3 / ((date(2026, 6, 1) - date(2026, 1, 1)).days / 365.25), 6)
+        self.assertEqual(result["market_data"]["periods_per_year"], expected)
+
     def test_backtest_non_dry_run_uses_configured_dataset(self) -> None:
         original_backtest_load_config = run_backtest_scheduler.load_config
         try:
@@ -390,24 +486,33 @@ class RiskExecutionBacktestTests(unittest.TestCase):
                 cfg["reports_dir"] = str(reports_dir)
                 run_backtest_scheduler.load_config = lambda: cfg
                 write_json(dataset_path, sample_transactions())
-                write_json(
-                    price_path,
-                    {
-                        "prices": {
-                            "AAPL": {"2026-06-01": 100.0, "2026-06-03": 101.0},
-                            "MSFT": {"2026-06-02": 200.0, "2026-06-03": 202.0},
-                            "NVDA": {"2026-06-03": 300.0},
-                            "SPY": {"2026-06-01": 500.0, "2026-06-03": 501.0},
-                        }
-                    },
-                )
+                write_json(price_path, _sample_price_history_payload())
 
                 result = run_backtest_scheduler.run(dry_run=False, days=180)
 
                 self.assertEqual(result["dataset"], str(dataset_path))
                 self.assertEqual(result["price_history_dataset"], str(price_path))
                 self.assertEqual(result["input_transactions"], len(sample_transactions()))
+                self.assertTrue(result["market_data"]["price_history_supplied"])
                 self.assertTrue((reports_dir / "backtest" / "latest.json").exists())
+        finally:
+            run_backtest_scheduler.load_config = original_backtest_load_config
+
+    def test_backtest_non_dry_run_requires_price_history(self) -> None:
+        original_backtest_load_config = run_backtest_scheduler.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = load_config()
+                dataset_path = Path(tmp) / "transactions.json"
+                cfg["backtest"] = {
+                    "dataset_path": str(dataset_path),
+                    "price_history_path": str(Path(tmp) / "missing-prices.json"),
+                }
+                run_backtest_scheduler.load_config = lambda: cfg
+                write_json(dataset_path, sample_transactions())
+
+                with self.assertRaises(FileNotFoundError):
+                    run_backtest_scheduler.run(dry_run=False, days=180)
         finally:
             run_backtest_scheduler.load_config = original_backtest_load_config
 

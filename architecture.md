@@ -163,10 +163,9 @@ every record is reconciled against, and ultimately superseded by, the official f
 
 ### 3.6 Market Data (prices, for sizing/exits/backtests — free)
 - **Alpaca Market Data** (already used by HawksTrade) for quotes/bars on equities &
-  options (entitlements permitting); primary because the broker is Alpaca. Delayed/IEX
-  data is acceptable for paper/backtests if the limitation is recorded.
-- **yfinance / Stooq** as free fallback for EOD history and corporate-action–adjusted
-  prices in backtests, subject to their current terms and reliability.
+  options (entitlements permitting); primary because the broker is Alpaca. Real-data
+  backtests use a checked-in adjusted daily bars export and fail closed if the matching
+  price-history file is missing.
 - A **ticker/issuer resolver** maps disclosed asset names (free-text, e.g. "Apple Inc.")
   to tradeable symbols, handling renames, delistings, and splits.
 

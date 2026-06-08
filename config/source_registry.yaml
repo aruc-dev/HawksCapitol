@@ -25,6 +25,18 @@
       "rate_limit": "polite"
     },
     {
+      "name": "alpaca_market_data",
+      "owner": "Alpaca",
+      "url": "https://docs.alpaca.markets/docs/market-data-faq",
+      "official": false,
+      "cost": "free_key",
+      "terms_url": "https://alpaca.markets/terms-conditions",
+      "terms_reviewed_at": "2026-06-08",
+      "automated_access_allowed": true,
+      "production_status": "enabled",
+      "rate_limit": "authenticated-plan"
+    },
+    {
       "name": "fmp",
       "owner": "Financial Modeling Prep",
       "url": "https://financialmodelingprep.com/",

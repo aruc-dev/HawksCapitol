@@ -19,12 +19,14 @@ Rules:
 |---|---|---:|---:|---|---|
 | `house_clerk` | U.S. House Office of the Clerk | free | yes | enabled | Official source of truth for House PTR ZIP/XML indexes and PTR PDFs. |
 | `senate_efd` | U.S. Senate eFD | free | yes | enabled | Official source of truth for Senate PTR search rows, electronic reports, and PDFs. |
+| `alpaca_market_data` | Alpaca | free_key | yes | enabled | Authenticated adjusted daily stock bars used to build checked-in backtest price-history exports. |
 | `fmp` | Financial Modeling Prep | free_key | no | disabled | Optional adapter; remains disabled until terms/entitlement review confirms automated free use. |
 | `congressinvests` | CongressInvests | free_key | no | disabled | Optional cross-check adapter; remains disabled until terms and limits are reviewed. |
 | `capitoltrades_reference` | CapitolTrades | unknown | no | manual_reference | Human-facing reference only; no automated scraping. |
 | `finnhub` | Finnhub | paid | no | disabled | Congressional endpoint is treated as paid/premium and cannot be enabled. |
 | `stock_watcher` | senate-stock-watcher data | free | no | history_only | Historical fixture/backtest helper only; not a live source. |
 
-Enabled production runs currently use only official House Clerk and Senate eFD sources.
-Optional third-party adapters are fixture-tested but fail closed unless source-registry
-policy allows them.
+Enabled disclosure ingestion currently uses only official House Clerk and Senate eFD
+sources. Real-data backtests use Alpaca market data only through a checked-in historical
+price export. Optional third-party disclosure adapters are fixture-tested but fail
+closed unless source-registry policy allows them.

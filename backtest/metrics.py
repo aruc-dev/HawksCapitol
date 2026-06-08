@@ -8,7 +8,7 @@ def compute_metrics(
     benchmark_curve: list[float] | None = None,
     trades: list[dict] | None = None,
     exposures: list[float] | None = None,
-    periods_per_year: int = 252,
+    periods_per_year: float = 252,
 ) -> dict:
     if not equity_curve:
         return {"total_return": 0.0, "cagr": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "hit_rate": 0.0, "vs_benchmark": 0.0}
@@ -44,7 +44,7 @@ def compute_metrics(
     }
 
 
-def _sharpe(returns: list[float], periods_per_year: int) -> float:
+def _sharpe(returns: list[float], periods_per_year: float) -> float:
     if len(returns) < 2:
         return 0.0
     mean = sum(returns) / len(returns)
