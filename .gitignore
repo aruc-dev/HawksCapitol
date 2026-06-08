@@ -1,0 +1,30 @@
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+
+# Local secrets and credentials
+.env
+.env.*
+*.env
+*.pem
+!config/.env.example
+
+# Runtime data
+data/raw/
+data/archive/
+logs/
+reports/tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# OS/editor metadata
+.DS_Store

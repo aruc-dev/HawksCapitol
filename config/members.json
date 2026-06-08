@@ -1,0 +1,20 @@
+[
+  {
+    "member_id": "demo-senator",
+    "full_name": "Demo Senator",
+    "chamber": "senate",
+    "party": "I",
+    "state": "US",
+    "committees": ["Finance"],
+    "aliases": ["D. Senator"]
+  },
+  {
+    "member_id": "demo-representative",
+    "full_name": "Demo Representative",
+    "chamber": "house",
+    "party": "I",
+    "state": "US",
+    "committees": ["Energy and Commerce"],
+    "aliases": ["D. Representative"]
+  }
+]

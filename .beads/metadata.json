@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "HawksCapitol",
+  "project_id": "252b6986-3ff1-4275-a792-fdbda26ed840"
+}

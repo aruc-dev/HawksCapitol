@@ -1,0 +1,9 @@
+[Unit]
+Description=Run HawksCapitol ingest periodically
+
+[Timer]
+OnCalendar=*:0/180
+Persistent=true
+
+[Install]
+WantedBy=timers.target

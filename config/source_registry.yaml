@@ -1,0 +1,88 @@
+{
+  "sources": [
+    {
+      "name": "house_clerk",
+      "owner": "U.S. House Office of the Clerk",
+      "url": "https://disclosures-clerk.house.gov/FinancialDisclosure",
+      "official": true,
+      "cost": "free",
+      "terms_url": "https://clerk.house.gov/terms",
+      "terms_reviewed_at": "2026-06-08",
+      "automated_access_allowed": true,
+      "production_status": "enabled",
+      "rate_limit": "polite"
+    },
+    {
+      "name": "senate_efd",
+      "owner": "U.S. Senate eFD",
+      "url": "https://efdsearch.senate.gov/search/",
+      "official": true,
+      "cost": "free",
+      "terms_url": "https://efdsearch.senate.gov/search/",
+      "terms_reviewed_at": "2026-06-08",
+      "automated_access_allowed": true,
+      "production_status": "enabled",
+      "rate_limit": "polite"
+    },
+    {
+      "name": "fmp",
+      "owner": "Financial Modeling Prep",
+      "url": "https://financialmodelingprep.com/",
+      "official": false,
+      "cost": "free_key",
+      "terms_url": "https://site.financialmodelingprep.com/terms-of-service",
+      "terms_reviewed_at": null,
+      "automated_access_allowed": false,
+      "production_status": "disabled",
+      "rate_limit": "free-tier"
+    },
+    {
+      "name": "congressinvests",
+      "owner": "CongressInvests",
+      "url": "https://congressinvests.com/",
+      "official": false,
+      "cost": "free_key",
+      "terms_url": "https://congressinvests.com/",
+      "terms_reviewed_at": null,
+      "automated_access_allowed": false,
+      "production_status": "disabled",
+      "rate_limit": "free-tier"
+    },
+    {
+      "name": "capitoltrades_reference",
+      "owner": "CapitolTrades",
+      "url": "https://www.capitoltrades.com/",
+      "official": false,
+      "cost": "unknown",
+      "terms_url": "https://www.capitoltrades.com/",
+      "terms_reviewed_at": null,
+      "automated_access_allowed": false,
+      "production_status": "manual_reference",
+      "rate_limit": "none"
+    },
+    {
+      "name": "finnhub",
+      "owner": "Finnhub",
+      "url": "https://finnhub.io/docs/api",
+      "official": false,
+      "cost": "paid",
+      "terms_url": "https://finnhub.io/terms",
+      "terms_reviewed_at": "2026-06-08",
+      "automated_access_allowed": false,
+      "production_status": "disabled",
+      "rate_limit": "premium"
+    },
+    {
+      "name": "stock_watcher",
+      "owner": "senate-stock-watcher data",
+      "url": "https://github.com/timothycarambat/senate-stock-watcher-data",
+      "official": false,
+      "cost": "free",
+      "terms_url": "https://github.com/timothycarambat/senate-stock-watcher-data",
+      "terms_reviewed_at": null,
+      "automated_access_allowed": false,
+      "production_status": "history_only",
+      "rate_limit": "manual"
+    }
+  ]
+}

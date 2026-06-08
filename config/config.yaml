@@ -1,0 +1,51 @@
+{
+  "mode": "paper",
+  "secrets_source": "env",
+  "source_registry_path": "config/source_registry.yaml",
+  "data_dir": "data",
+  "reports_dir": "reports",
+  "risk": {
+    "account_equity": 100000.0,
+    "risk_per_trade_pct": 0.005,
+    "max_position_pct": 0.05,
+    "max_positions": 10,
+    "max_member_exposure_pct": 0.10,
+    "max_sector_exposure_pct": 0.25,
+    "daily_loss_limit_pct": 0.02,
+    "min_cash_buffer_pct": 0.05,
+    "max_daily_orders": 8,
+    "max_weekly_turnover_pct": 0.40
+  },
+  "signals": {
+    "min_member_score": 0.55,
+    "min_freshness_score": 0.35,
+    "min_conviction_score": 0.45,
+    "min_entry_quality_score": 0.50,
+    "max_filing_lag_days": 60,
+    "max_filing_gap_pct": 0.25,
+    "cluster_window_days": 30
+  },
+  "exits": {
+    "stop_loss_pct": 0.08,
+    "take_profit_pct": 0.20,
+    "trail_activation_pct": 0.12,
+    "trailing_stop_pct": 0.08,
+    "max_alpha_age_days": 60,
+    "max_hold_days": 90,
+    "conviction_drop_exit_score": 0.30
+  },
+  "sources": {
+    "house_clerk": true,
+    "senate_efd": true,
+    "fmp": false,
+    "congressinvests": false,
+    "finnhub": false,
+    "capitoltrades_reference": false,
+    "stock_watcher": false
+  },
+  "execution": {
+    "allow_live": false,
+    "require_human_live_approval": true,
+    "options_enabled": false
+  }
+}

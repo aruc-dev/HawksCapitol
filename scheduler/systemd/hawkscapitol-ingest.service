@@ -1,0 +1,10 @@
+[Unit]
+Description=HawksCapitol ingest job
+After=network-online.target hawkscapitol-secrets.service
+Requires=hawkscapitol-secrets.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ec2-user/HawksCapitol
+EnvironmentFile=/dev/shm/.hawkscapitol.env
+ExecStart=/home/ec2-user/HawksCapitol/.venv/bin/python scheduler/run_ingest.py
