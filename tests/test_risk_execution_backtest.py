@@ -232,6 +232,21 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         finally:
             run_scan.load_config = original_scan_load_config
 
+    def test_non_dry_scan_reports_malformed_canonical_dates(self) -> None:
+        original_scan_load_config = run_scan.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = load_config()
+                cfg["data_dir"] = str(Path(tmp) / "runtime-data")
+                run_scan.load_config = lambda: cfg
+                bad_row = {**sample_transactions()[0].__dict__, "tx_date": "2026-13-99"}
+                write_json(Path(cfg["data_dir"]) / "canonical" / "transactions.json", [bad_row])
+
+                with self.assertRaisesRegex(ValueError, "invalid or missing tx_date"):
+                    run_scan.run(dry_run=False, as_of=sample_as_of())
+        finally:
+            run_scan.load_config = original_scan_load_config
+
     def test_scan_and_reconcile_use_configured_data_dir_by_default(self) -> None:
         original_scan_load_config = run_scan.load_config
         original_reconcile_load_config = reconcile_trade_log.load_config

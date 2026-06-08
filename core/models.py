@@ -18,7 +18,10 @@ def parse_date(value: str | date | datetime | None) -> date | None:
             return datetime.strptime(text, fmt).date()
         except ValueError:
             pass
-    return date.fromisoformat(text[:10])
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)

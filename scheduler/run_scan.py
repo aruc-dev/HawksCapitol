@@ -88,7 +88,7 @@ def _transaction_from_row(row: object) -> Transaction:
 def _required_date(value: object, field_name: str) -> date:
     parsed = parse_date(value)  # type: ignore[arg-type]
     if parsed is None:
-        raise ValueError(f"canonical transaction missing {field_name}")
+        raise ValueError(f"canonical transaction has invalid or missing {field_name}")
     return parsed
 
 

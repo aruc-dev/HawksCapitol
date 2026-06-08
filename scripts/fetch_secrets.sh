@@ -13,7 +13,7 @@ if [[ "${require_shm}" == "1" && "${target}" != /dev/shm/* ]]; then
   exit 1
 fi
 
-if [[ "${HAWKSCAPITOL_DRY_RUN:-0}" == "1" ]]; then
+if [[ "${dry_run}" == "1" ]]; then
   echo "dry-run: would fetch AWS Secrets Manager secret '${secret_id}' into '${target}' (values redacted)"
   exit 0
 fi

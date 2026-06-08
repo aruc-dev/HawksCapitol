@@ -192,6 +192,20 @@ class SourcesAndIngestionTests(unittest.TestCase):
         self.assertEqual(txs[0].asset_type, "option")
         self.assertEqual(txs[0].option_meta["right"], "call")
         self.assertEqual(txs[0].parse_confidence, 0.4)
+        _, malformed_expiry_txs = normalize_records([
+            {
+                "doc_id": "opt-bad-expiry",
+                "source": "senate_efd",
+                "member_name": "Demo Senator",
+                "filing_date": "2026-06-01",
+                "tx_date": "2026-05-01",
+                "asset_name": "Apple Inc. $200 Call 2026-13-99",
+                "tx_type": "Purchase",
+                "amount": "$1,001 - $15,000",
+            }
+        ], TickerResolver())
+        self.assertEqual(malformed_expiry_txs[0].asset_type, "option")
+        self.assertIsNone(malformed_expiry_txs[0].option_meta["expiry"])
 
     def test_amount_parser_and_normalizer(self) -> None:
         self.assertEqual(parse_amount_range("$1,001 - $15,000"), (1001.0, 15000.0, 8000.5))
@@ -459,9 +473,11 @@ class SourcesAndIngestionTests(unittest.TestCase):
         ]
         self.assertEqual(visible_committees(snapshots, "m1", date(2026, 6, 1)), ("Finance",))
         rows = parse_committee_snapshot_rows([
-            {"member_id": "m2", "committees": "Finance; Banking", "as_of_date": "2026-01-01"}
-        ])
+            {"member_id": "m2", "committees": "Finance; Banking", "as_of_date": "2026-01-01"},
+            {"member_id": "m4", "committees": "Rules", "as_of_date": "2026-13-99"},
+        ], default_as_of=date(2026, 3, 1))
         self.assertEqual(rows[0].committees, ("Finance", "Banking"))
+        self.assertEqual(visible_committees(rows, "m4", date(2026, 3, 2)), ("Rules",))
         xml_rows = parse_committee_snapshot_xml(
             "<Members><Member><member_id>m3</member_id><committee>Energy</committee></Member></Members>",
             date(2026, 2, 1),

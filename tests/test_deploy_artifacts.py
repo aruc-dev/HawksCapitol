@@ -59,6 +59,10 @@ class DeployArtifactTests(unittest.TestCase):
             self.assertIn(f"hawkscapitol-{name}.service", before_line)
 
     def test_fetch_secrets_dry_run_and_validation_are_redacted(self) -> None:
+        script_text = (REPO_ROOT / "scripts" / "fetch_secrets.sh").read_text(encoding="utf-8")
+        self.assertIn('dry_run="${HAWKSCAPITOL_DRY_RUN:-0}"', script_text)
+        self.assertIn('if [[ "${dry_run}" == "1" ]]; then', script_text)
+
         env = os.environ.copy()
         env.update({"HAWKSCAPITOL_DRY_RUN": "1", "HAWKSCAPITOL_ENV_FILE": "/tmp/hc-test.env"})
         dry_run = subprocess.run(
