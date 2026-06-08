@@ -22,5 +22,5 @@ existing_secret_arn    = ""
 enable_systemd_timers = false
 
 extra_tags = {
-  Owner = "Arun"
+  Owner = "replace-me"
 }

@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from backtest.metrics import compute_metrics
 from backtest.simulator import run_backtest, validate_backtest
@@ -429,6 +430,14 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         self.assertEqual(window_return(series, date(2026, 6, 1), date(2026, 6, 7)), 0.10)
         self.assertIsNone(window_return(series, date(2026, 6, 6), date(2026, 6, 7)))
 
+    def test_price_history_window_sorts_once(self) -> None:
+        series = {date(2026, 6, 5): 110.0, date(2026, 6, 2): 100.0}
+
+        with patch("core.price_history.sorted", wraps=sorted, create=True) as sort_spy:
+            self.assertEqual(window_return(series, date(2026, 6, 1), date(2026, 6, 7)), 0.10)
+
+        self.assertEqual(sort_spy.call_count, 1)
+
     def test_backtest_uses_supplied_price_history_without_fallback(self) -> None:
         cfg = load_config()
         result = run_backtest(
@@ -459,6 +468,23 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         self.assertTrue(result["market_data"]["price_history_supplied"])
         self.assertEqual(result["signals"], 0)
         self.assertEqual(result["market_data"]["missing_price_returns"], 3)
+
+    def test_backtest_window_filters_trades_and_baselines(self) -> None:
+        cfg = load_config()
+        old_tx = sample_transactions()[0].__class__(
+            **{
+                **sample_transactions()[0].__dict__,
+                "tx_id": "pre-window",
+                "doc_id": "pre-window",
+                "filing_date": date(2026, 5, 1),
+                "tx_date": date(2026, 4, 20),
+            }
+        )
+
+        result = run_backtest(sample_transactions() + [old_tx], cfg, sample_sector_map(), sample_as_of(), days=30)
+
+        self.assertEqual(result["baselines"]["equal_weight_copy_all"]["signals"], len(sample_transactions()))
+        self.assertNotIn("2026-05-01", {trade["filing_date"] for trade in result["trades"]})
 
     def test_cagr_uses_return_period_count(self) -> None:
         metrics = compute_metrics([100.0, 110.0], periods_per_year=252)

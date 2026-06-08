@@ -32,8 +32,9 @@ def run_backtest(
     periods_per_year = _effective_periods_per_year(eligible_dates)
     for current in eligible_dates:
         visible = visible_transactions(transactions, current)
+        in_window = [tx for tx in visible if start_date <= tx.filing_date <= current]
         scores = compute_member_scores(visible, current, price_history=price_history, sector_map=sector_map)
-        signals = [sig for sig in build_copy_signals(visible, scores, cfg, sector_map, current) if not sig.blocked_reason]
+        signals = [sig for sig in build_copy_signals(in_window, scores, cfg, sector_map, current) if not sig.blocked_reason]
         day_pnl = 0.0
         day_exposure = 0.0
         for signal in signals:
@@ -167,7 +168,7 @@ def _baselines(
     start_date: date,
     price_history: dict[str, dict[date, float]] | None = None,
 ) -> dict:
-    visible = [tx for tx in transactions if tx.filing_date <= as_of and tx.tx_type == "buy"]
+    visible = [tx for tx in transactions if start_date <= tx.filing_date <= as_of and tx.tx_type == "buy"]
     spy_return = window_return((price_history or {}).get("SPY", {}), start_date, as_of)
     copy_all_return = 0.003 * len(visible)
     no_gap_count = sum(1 for tx in visible if tx.filing_gap_pct is None or abs(tx.filing_gap_pct) <= cfg["signals"]["max_filing_gap_pct"])

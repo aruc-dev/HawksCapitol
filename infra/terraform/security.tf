@@ -28,10 +28,26 @@ resource "aws_security_group" "paper_node" {
   }
 
   egress {
-    description = "Outbound HTTPS/package/source access"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "Outbound DNS over UDP"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Outbound DNS over TCP fallback"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Outbound HTTPS for packages, git, AWS APIs, and source access"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 

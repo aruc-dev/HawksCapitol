@@ -1,8 +1,9 @@
 # Backtesting
 
 Backtests replay disclosures by `filing_date`. A simulated day can only see filings
-whose `filing_date` is on or before that day; `tx_date` is used only for lag, decay,
-and closed-window return calculations.
+whose `filing_date` is on or before that day; trade candidates and non-SPY baselines
+are constrained to the requested `--days` window. `tx_date` is used only for lag,
+decay, and closed-window return calculations.
 
 ## Checked-In Dataset
 

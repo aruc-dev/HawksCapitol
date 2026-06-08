@@ -46,6 +46,18 @@ class TerraformDeploymentTests(unittest.TestCase):
         self.assertIn("secret_id             = local.secret_arn", text)
         self.assertIn('cfg["mode"] != "paper"', user_data)
         self.assertIn('execution.allow_live=true', user_data)
+        self.assertNotIn("Arun", tfvars)
+        self.assertIn('Owner = "replace-me"', tfvars)
+
+    def test_security_group_egress_is_dns_and_https_only(self) -> None:
+        security = (TERRAFORM_DIR / "security.tf").read_text(encoding="utf-8")
+
+        self.assertNotIn('protocol    = "-1"', security)
+        self.assertIn('description = "Outbound DNS over UDP"', security)
+        self.assertIn('description = "Outbound DNS over TCP fallback"', security)
+        self.assertIn('description = "Outbound HTTPS for packages, git, AWS APIs, and source access"', security)
+        self.assertIn('from_port   = 443', security)
+        self.assertIn('protocol    = "tcp"', security)
 
     def test_user_data_bootstraps_systemd_and_safe_validation(self) -> None:
         text = (TERRAFORM_DIR / "user_data.sh.tftpl").read_text(encoding="utf-8")

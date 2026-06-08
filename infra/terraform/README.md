@@ -4,6 +4,7 @@ This Terraform root module provisions the paper AWS runtime for HawksCapitol:
 
 - dedicated VPC, public subnet, internet gateway, and route table;
 - EC2 security group with no inbound access by default;
+- outbound security group egress limited to DNS plus HTTPS for bootstrap/runtime access;
 - Amazon Linux 2023 EC2 instance with IMDSv2 required;
 - IAM role/profile with read-only access to the HawksCapitol paper secret;
 - optional Secrets Manager metadata for `hawkscapitol/keys`;
@@ -23,6 +24,8 @@ terraform init
 terraform plan
 terraform apply
 ```
+
+Replace placeholder values such as `extra_tags.Owner = "replace-me"` before applying.
 
 After the first apply, write paper secret values:
 

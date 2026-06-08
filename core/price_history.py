@@ -27,12 +27,17 @@ def price_on_or_before(series: dict[date, float], target: date) -> tuple[date, f
 
 
 def window_return(series: dict[date, float], start: date, end: date) -> float | None:
-    start_price = price_on_or_after(series, start)
-    end_price = price_on_or_before(series, end)
-    if not start_price or not end_price:
+    if not series:
         return None
-    start_day, start_value = start_price
-    end_day, end_value = end_price
+    dates = sorted(series)
+    start_idx = bisect_left(dates, start)
+    end_idx = bisect_right(dates, end) - 1
+    if start_idx >= len(dates) or end_idx < 0:
+        return None
+    start_day = dates[start_idx]
+    end_day = dates[end_idx]
+    start_value = series[start_day]
+    end_value = series[end_day]
     if end_day < start_day or start_value <= 0:
         return None
     return (end_value - start_value) / start_value
