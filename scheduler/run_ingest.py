@@ -138,6 +138,7 @@ def run(
         "would_write": [
             str(data_dir / "canonical" / "disclosures.json"),
             str(data_dir / "canonical" / "transactions.json"),
+            str(report_dir / "reconciliation.json"),
         ],
     }
 
@@ -203,6 +204,8 @@ def _load_records(source: str | None, dry_run: bool, since: date | None, year: i
         result = load_stock_watcher_records(STOCK_WATCHER_DRY_RUN_PAYLOAD if dry_run else [], since, fixture_only=dry_run)
         return result.records, [row.__dict__ for row in result.health]
     if source == "house_archive":
+        if not dry_run:
+            raise ValueError("house_archive uses fixture data and is only available with dry_run=True")
         zip_bytes = _zip_bytes("2024FD.xml", HOUSE_ARCHIVE_DRY_RUN_XML)
         result = load_house_archive_records({year or 2024: zip_bytes}, HOUSE_ARCHIVE_DRY_RUN_PDFS, since)
         return result.records, [row.__dict__ for row in result.health]

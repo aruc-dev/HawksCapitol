@@ -89,6 +89,15 @@ class SourcesAndIngestionTests(unittest.TestCase):
             self.assertEqual(source.fetch(date(2026, 1, 1))[0].doc_id, "200")
             self.assertEqual(source.fetch(date(2026, 1, 1))[0].doc_id, "200")
             self.assertEqual(session.requests[1]["headers"]["If-None-Match"], "abc")
+            bad_meta_cache = Path(tmp) / "bad-meta"
+            cached_zip = bad_meta_cache / "financial-pdfs" / "2026FD.zip"
+            cached_zip.parent.mkdir(parents=True)
+            cached_zip.write_bytes(zip_payload)
+            cached_zip.with_suffix(cached_zip.suffix + ".meta.json").write_text("{bad json", encoding="utf-8")
+            bad_meta_session = _FakeSession([_FakeResponse(200, zip_payload, {"ETag": "fresh"})])
+            bad_meta_source = HouseClerkSource(year=2026, cache_dir=bad_meta_cache, session=bad_meta_session, backoff_seconds=0)
+            self.assertEqual(bad_meta_source.fetch(date(2026, 1, 1))[0].doc_id, "200")
+            self.assertNotIn("If-None-Match", bad_meta_session.requests[0]["headers"])
 
     def test_pdf_text_extraction_and_house_ptr_rows_normalize(self) -> None:
         pdf = b"%PDF-1.4\n1 0 obj <<>> stream\nBT (Apple Inc. (AAPL) Purchase 2026-05-01 $1,001 - $15,000) Tj ET\nendstream\nendobj\n%%EOF"
@@ -229,6 +238,7 @@ class SourcesAndIngestionTests(unittest.TestCase):
         }
         resolved = [resolver.resolve(asset) == symbol for asset, symbol in fixtures.items()]
         self.assertGreaterEqual(sum(resolved) / len(resolved), 0.95)
+        self.assertEqual(resolver.resolve("Unlisted Holding (aapl)"), "AAPL")
 
     def test_dedupe_and_reconcile_prefer_official(self) -> None:
         _, txs = normalize_records([
@@ -341,6 +351,19 @@ class SourcesAndIngestionTests(unittest.TestCase):
         house = run_ingest.run(dry_run=True, source="house_archive", since=date(2024, 1, 1), year=2024)
         self.assertEqual(stock["transactions"], 1)
         self.assertEqual(house["transactions"], 1)
+        with self.assertRaises(ValueError):
+            run_ingest.run(dry_run=False, source="house_archive", since=date(2024, 1, 1), year=2024)
+
+    def test_ingest_non_dry_run_reports_all_written_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp) / "data"
+            reports_dir = Path(tmp) / "reports"
+            result = run_ingest.run(dry_run=False, source="sample", output_dir=data_dir, reports_dir=reports_dir)
+
+            self.assertIn(str(data_dir / "canonical" / "disclosures.json"), result["would_write"])
+            self.assertIn(str(data_dir / "canonical" / "transactions.json"), result["would_write"])
+            self.assertIn(str(reports_dir / "reconciliation.json"), result["would_write"])
+            self.assertTrue((reports_dir / "reconciliation.json").exists())
 
     def test_amendments_supersede_and_fuzzy_records_collapse(self) -> None:
         _, txs = normalize_records([

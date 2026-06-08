@@ -75,7 +75,7 @@ class TickerResolver:
         key = _normalize_name(asset_name)
         if not key:
             return None
-        symbol_match = re.search(r"\(([A-Z][A-Z0-9.\-]{0,9})\)", asset_name)
+        symbol_match = re.search(r"\(([A-Z][A-Z0-9.\-]{0,9})\)", asset_name, flags=re.IGNORECASE)
         if symbol_match:
             return symbol_match.group(1).upper()
         symbol_match = re.search(r"\b(?:ticker|symbol)\s*[:\-]\s*([A-Z][A-Z0-9.\-]{0,9})\b", asset_name, flags=re.IGNORECASE)

@@ -158,7 +158,10 @@ class HouseClerkSource:
         meta_path = cache_path.with_suffix(cache_path.suffix + ".meta.json")
         headers = {"User-Agent": DEFAULT_USER_AGENT}
         if meta_path.exists():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                meta = {}
             if meta.get("etag"):
                 headers["If-None-Match"] = meta["etag"]
             if meta.get("last_modified"):
