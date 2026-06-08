@@ -1,5 +1,7 @@
 # HawksCapitol
 
+![HawksCapitol Brand](assets/brand/hawkscapitol-brand.png)
+
 Paper-first congressional trade copy-trading system using free public STOCK Act
 disclosures, point-in-time scoring, Alpaca-compatible execution boundaries, and
 lag-aware exit/risk controls.
