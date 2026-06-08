@@ -271,6 +271,29 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         finally:
             run_scan.load_config = original_scan_load_config
 
+    def test_non_dry_scan_corrupt_persisted_inputs_fail_closed(self) -> None:
+        original_scan_load_config = run_scan.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = load_config()
+                cfg["data_dir"] = str(Path(tmp) / "runtime-data")
+                cfg["sector_map_path"] = str(Path(tmp) / "sectors.json")
+                run_scan.load_config = lambda: cfg
+                data_dir = Path(cfg["data_dir"])
+                transactions_path = data_dir / "canonical" / "transactions.json"
+                transactions_path.parent.mkdir(parents=True)
+                transactions_path.write_text("{bad json", encoding="utf-8")
+                Path(cfg["sector_map_path"]).write_text("{bad json", encoding="utf-8")
+
+                result = run_scan.run(dry_run=False, as_of=sample_as_of())
+
+                self.assertEqual(result["signals"], [])
+                self.assertEqual(result["accepted_orders"], [])
+                self.assertEqual(read_json(data_dir / "signals" / "latest.json"), [])
+                self.assertEqual(read_json(data_dir / "trade_log.json"), [])
+        finally:
+            run_scan.load_config = original_scan_load_config
+
     def test_non_dry_scan_reports_malformed_canonical_dates(self) -> None:
         original_scan_load_config = run_scan.load_config
         try:
@@ -308,6 +331,22 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         finally:
             run_scan.load_config = original_scan_load_config
             reconcile_trade_log.load_config = original_reconcile_load_config
+
+    def test_reconcile_corrupt_trade_log_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state_path = Path(tmp) / "paper_state.json"
+            trade_log_path = Path(tmp) / "trade_log.json"
+            PaperBroker(state_path).submit(Order("open-aapl", "AAPL", "buy", 1, limit_price=100.0))
+            trade_log_path.write_text("{bad json", encoding="utf-8")
+
+            result = reconcile_trade_log.run(
+                dry_run=False,
+                broker_state_path=state_path,
+                trade_log_path=trade_log_path,
+            )
+
+            self.assertEqual(result["missing_in_broker"], [])
+            self.assertEqual(result["missing_in_log"], ["AAPL"])
 
     def test_protective_stop_plans_are_deterministic(self) -> None:
         pos = Position("trade-1", "AAPL", "stock", date(2026, 6, 1), 100, 5, 92, 120, 100)

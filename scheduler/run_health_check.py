@@ -13,7 +13,7 @@ from core.models import parse_date
 from core.sample_data import sample_transactions
 from core.serialization import to_jsonable
 from core.source_registry import load_source_registry, validate_enabled_sources
-from ingestion.storage import read_json, write_json
+from ingestion.storage import read_json_safe, write_json
 
 
 def run(dry_run: bool = False, as_of: date | None = None) -> dict:
@@ -41,7 +41,8 @@ def run(dry_run: bool = False, as_of: date | None = None) -> dict:
 def _load_transactions(dry_run: bool, cfg: dict) -> list[dict]:
     if dry_run:
         return [tx.__dict__ for tx in sample_transactions()]
-    return read_json(Path(cfg.get("data_dir", "data")) / "canonical" / "transactions.json", [])
+    rows = read_json_safe(Path(cfg.get("data_dir", "data")) / "canonical" / "transactions.json", [], list)
+    return [row for row in rows if isinstance(row, dict)]
 
 
 def _source_status(cfg: dict, registry: dict, transactions: list[dict], as_of: date) -> dict:

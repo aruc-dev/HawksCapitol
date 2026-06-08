@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.config_loader import load_config
 from core.serialization import to_jsonable
-from ingestion.storage import read_json, write_json
+from ingestion.storage import read_json_safe, write_json
 from scheduler.run_report import run as run_daily_report
 
 
@@ -38,10 +38,18 @@ def _daily_report(report_dir: Path, dry_run: bool) -> dict:
     if dry_run:
         return run_daily_report(dry_run=True)
     daily_path = report_dir / "daily" / "latest.json"
-    existing = read_json(daily_path)
-    if existing is not None:
+    existing = read_json_safe(daily_path, None, dict)
+    if _valid_daily_report(existing):
         return existing
     return run_daily_report(dry_run=False, reports_dir=report_dir)
+
+
+def _valid_daily_report(payload: object) -> bool:
+    return (
+        isinstance(payload, dict)
+        and isinstance(payload.get("summary"), dict)
+        and isinstance(payload.get("backtest"), dict)
+    )
 
 
 def main() -> None:

@@ -62,6 +62,25 @@ class ReportingDashboardTests(unittest.TestCase):
         finally:
             run_health_check.load_config = original_load_config
 
+    def test_health_check_corrupt_canonical_transactions_fails_closed(self) -> None:
+        original_load_config = run_health_check.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = original_load_config()
+                cfg["data_dir"] = str(Path(tmp) / "runtime-data")
+                transactions_path = Path(cfg["data_dir"]) / "canonical" / "transactions.json"
+                transactions_path.parent.mkdir(parents=True)
+                transactions_path.write_text("{bad json", encoding="utf-8")
+                run_health_check.load_config = lambda: cfg
+
+                payload = run_health_check.run(dry_run=False, as_of=date(2026, 6, 8))
+
+                self.assertTrue(payload["ok"])
+                self.assertEqual(payload["source_status"]["house_clerk"]["row_count"], 0)
+                self.assertEqual(payload["source_status"]["senate_efd"]["row_count"], 0)
+        finally:
+            run_health_check.load_config = original_load_config
+
     def test_daily_report_and_dashboard_render_without_flask(self) -> None:
         report = run_report.run(dry_run=True)
 
@@ -139,6 +158,50 @@ class ReportingDashboardTests(unittest.TestCase):
             run_report.run_risk = original_risk
             run_report.run_health = original_health
 
+    def test_non_dry_daily_report_corrupt_persisted_artifacts_fail_closed(self) -> None:
+        original_load_config = run_report.load_config
+        original_scan = run_report.run_scan_report
+        original_backtest = run_report.run_backtest_report
+        original_risk = run_report.run_risk
+        original_health = run_report.run_health
+
+        def forbidden_runner(*_args, **_kwargs):
+            raise AssertionError("non-dry report should not invoke sample-producing runners")
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = original_load_config()
+                cfg["data_dir"] = str(Path(tmp) / "runtime-data")
+                cfg["reports_dir"] = str(Path(tmp) / "runtime-reports")
+                data_dir = Path(cfg["data_dir"])
+                report_dir = Path(cfg["reports_dir"])
+                for path in (
+                    data_dir / "signals" / "latest.json",
+                    data_dir / "trade_log.json",
+                    report_dir / "backtest" / "latest.json",
+                    report_dir / "risk_decisions.json",
+                ):
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("{bad json", encoding="utf-8")
+                run_report.load_config = lambda: cfg
+                run_report.run_scan_report = forbidden_runner
+                run_report.run_backtest_report = forbidden_runner
+                run_report.run_risk = forbidden_runner
+                run_report.run_health = lambda dry_run=False: {"ok": True, "alerts": []}
+
+                report = run_report.run(dry_run=False)
+
+                self.assertEqual(report["summary"]["signals"], 0)
+                self.assertEqual(report["summary"]["backtest_verdict"], "not_available")
+                self.assertEqual(report["summary"]["risk_decisions"], 0)
+                self.assertEqual(report["scan"], {"signals": [], "accepted_orders": []})
+        finally:
+            run_report.load_config = original_load_config
+            run_report.run_scan_report = original_scan
+            run_report.run_backtest_report = original_backtest
+            run_report.run_risk = original_risk
+            run_report.run_health = original_health
+
     def test_non_dry_weekly_report_reuses_persisted_daily_report(self) -> None:
         original_daily_report = run_weekly_report.run_daily_report
         try:
@@ -157,6 +220,34 @@ class ReportingDashboardTests(unittest.TestCase):
                 self.assertEqual(weekly["summary"]["trade_count"], 3)
                 self.assertEqual(weekly["latest_daily_report"], daily)
                 self.assertEqual(read_json(report_dir / "weekly" / "latest.json")["member_performance"], {"m1": 2})
+        finally:
+            run_weekly_report.run_daily_report = original_daily_report
+
+    def test_non_dry_weekly_report_corrupt_daily_regenerates(self) -> None:
+        original_daily_report = run_weekly_report.run_daily_report
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                report_dir = Path(tmp) / "runtime-reports"
+                daily_path = report_dir / "daily" / "latest.json"
+                daily_path.parent.mkdir(parents=True)
+                daily_path.write_text("{bad json", encoding="utf-8")
+                regenerated = {
+                    "summary": {"signals": 1, "backtest_verdict": "watch", "health_ok": True},
+                    "backtest": {"metrics": {"trade_count": 1, "per_member": {}, "per_sector": {}}},
+                }
+                calls = []
+
+                def regenerate(dry_run=False, reports_dir=None):
+                    calls.append((dry_run, reports_dir))
+                    return regenerated
+
+                run_weekly_report.run_daily_report = regenerate
+
+                weekly = run_weekly_report.run(dry_run=False, reports_dir=report_dir)
+
+                self.assertEqual(calls, [(False, report_dir)])
+                self.assertEqual(weekly["latest_daily_report"], regenerated)
+                self.assertEqual(weekly["summary"]["signals"], 1)
         finally:
             run_weekly_report.run_daily_report = original_daily_report
 

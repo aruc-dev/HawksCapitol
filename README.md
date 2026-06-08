@@ -78,6 +78,9 @@ dry-run fixture paths.
 Non-dry live-promotion checks also read the persisted real backtest report from
 `reports/backtest/latest.json`; missing, malformed, sample-backed, or fallback-return
 reports are treated as non-passing evidence.
+Corrupt or partially written scheduler JSON inputs are treated as missing or empty at
+scheduler boundaries, so paper timers fail closed and daily/weekly reports can
+regenerate instead of crashing.
 Malformed persisted filing dates are ignored for source freshness, and malformed option
 expiries are treated as unknown so health/report/exit timers keep evaluating remaining
 paper-risk controls.

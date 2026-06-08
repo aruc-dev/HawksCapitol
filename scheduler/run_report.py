@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.config_loader import load_config
 from core.serialization import to_jsonable
-from ingestion.storage import read_json, write_json
+from ingestion.storage import read_json_safe, write_json
 from scheduler.run_backtest import run as run_backtest_report
 from scheduler.run_health_check import run as run_health
 from scheduler.run_risk_check import run as run_risk
@@ -49,13 +49,17 @@ def _report_inputs(cfg: dict, report_dir: Path, dry_run: bool) -> tuple[dict, di
 
     data_dir = Path(cfg.get("data_dir", "data"))
     scan = {
-        "signals": read_json(data_dir / "signals" / "latest.json", []),
-        "accepted_orders": read_json(data_dir / "trade_log.json", []),
+        "signals": _dict_rows(read_json_safe(data_dir / "signals" / "latest.json", [], list)),
+        "accepted_orders": _dict_rows(read_json_safe(data_dir / "trade_log.json", [], list)),
     }
-    backtest = read_json(report_dir / "backtest" / "latest.json", _empty_backtest())
+    backtest = read_json_safe(report_dir / "backtest" / "latest.json", _empty_backtest(), dict)
     health = run_health(dry_run=False)
-    risk = {"decisions": read_json(report_dir / "risk_decisions.json", [])}
+    risk = {"decisions": _dict_rows(read_json_safe(report_dir / "risk_decisions.json", [], list))}
     return scan, backtest, health, risk
+
+
+def _dict_rows(rows: list) -> list[dict]:
+    return [row for row in rows if isinstance(row, dict)]
 
 
 def _empty_backtest() -> dict:

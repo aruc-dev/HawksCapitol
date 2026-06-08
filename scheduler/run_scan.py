@@ -17,7 +17,7 @@ from core.order_governor import OrderGovernor
 from core.sample_data import sample_as_of, sample_sector_map, sample_transactions
 from core.serialization import to_jsonable
 from engine.copy_signal import build_copy_signals
-from ingestion.storage import read_json, write_json
+from ingestion.storage import read_json_safe, write_json
 
 
 TRANSACTION_FIELDS = {field.name for field in fields(Transaction)}
@@ -56,15 +56,13 @@ def _load_scan_inputs(cfg: dict, dry_run: bool) -> tuple[list[Transaction], date
         return sample_transactions(), sample_as_of(), sample_sector_map()
 
     data_dir = Path(cfg.get("data_dir", "data"))
-    tx_rows = read_json(data_dir / "canonical" / "transactions.json", [])
+    tx_rows = read_json_safe(data_dir / "canonical" / "transactions.json", [], list)
     sector_map = _load_sector_map(Path(cfg.get("sector_map_path", "config/sectors.json")))
     return _transactions_from_rows(tx_rows), date.today(), sector_map
 
 
 def _load_sector_map(path: Path) -> dict[str, str]:
-    rows = read_json(path, {})
-    if not isinstance(rows, dict):
-        raise ValueError(f"sector map must be a JSON object: {path}")
+    rows = read_json_safe(path, {}, dict)
     return {str(symbol).upper(): str(sector) for symbol, sector in rows.items()}
 
 
