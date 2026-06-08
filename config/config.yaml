@@ -4,6 +4,9 @@
   "source_registry_path": "config/source_registry.yaml",
   "data_dir": "data",
   "reports_dir": "reports",
+  "backtest": {
+    "dataset_path": "data/backtest/official_house_6mo/transactions.json"
+  },
   "risk": {
     "account_equity": 100000.0,
     "risk_per_trade_pct": 0.005,

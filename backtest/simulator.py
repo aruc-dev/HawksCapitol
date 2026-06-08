@@ -26,6 +26,7 @@ def run_backtest(
     trades = []
     seen_signals: set[str] = set()
     price_history = price_history or {}
+    price_history_supplied = bool(price_history)
     for current in eligible_dates:
         visible = visible_transactions(transactions, current)
         scores = compute_member_scores(visible, current, price_history=price_history, sector_map=sector_map)
@@ -68,6 +69,10 @@ def run_backtest(
         "validation": validation,
         "trades": trades,
         "equity_curve": [round(value, 2) for value in equity],
+        "market_data": {
+            "price_history_supplied": price_history_supplied,
+            "return_model": "price_history_30d_returns" if price_history_supplied else "simulator_fallback_returns",
+        },
         "walk_forward": {
             "train_fraction": 0.7,
             "validation_fraction": 0.3,
@@ -83,6 +88,9 @@ def validate_backtest(metrics: dict, baselines: dict) -> dict:
     elif metrics["max_drawdown"] < -0.20:
         verdict = "fail"
         reason = "drawdown exceeds ceiling"
+    elif metrics.get("vs_benchmark", 0.0) <= 0:
+        verdict = "watch"
+        reason = "strategy has not beaten benchmark curve"
     elif metrics["total_return"] <= baselines["spy"]["total_return"]:
         verdict = "watch"
         reason = "strategy has not beaten SPY baseline"

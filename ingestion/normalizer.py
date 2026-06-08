@@ -9,7 +9,7 @@ from sources.ticker_resolver import TickerResolver
 
 
 def parse_amount_range(text: str) -> tuple[float, float, float]:
-    values = [float(part.replace(",", "")) for part in re.findall(r"\$?([0-9][0-9,]*)", text or "")]
+    values = [float(part.replace(",", "")) for part in re.findall(r"\$?\s*([0-9][0-9,]*(?:\.\d+)?)", text or "")]
     if not values:
         return 0.0, 0.0, 0.0
     if len(values) == 1:
@@ -78,7 +78,7 @@ def normalize_record(record: dict, resolver: TickerResolver | None = None) -> tu
     tx_type = normalize_tx_type(record.get("tx_type") or record.get("transaction_type") or record.get("type") or "")
     asset_name = record.get("asset_name") or record.get("asset") or record.get("asset_name_raw") or ticker or "Unknown"
     option_meta = record.get("option_meta") or parse_option_meta(asset_name)
-    asset_type = classify_asset_type(asset_name, option_meta)
+    asset_type = record.get("asset_type") or classify_asset_type(asset_name, option_meta)
     price_tx = record.get("price_on_tx_date")
     price_filing = record.get("price_on_filing_date")
     filing_gap_pct = None

@@ -27,7 +27,7 @@ def parse_house_index(xml_text: str, year: int) -> list[RawFiling]:
         doc_id = children.get("docid") or children.get("doc_id")
         if not doc_id or filing_type != "P":
             continue
-        name = children.get("name") or "Unknown"
+        name = _house_member_name(children)
         filing_date = _parse_house_date(children.get("filingdate") or children.get("filing_date"), year)
         if filing_date is None:
             continue
@@ -58,10 +58,48 @@ def parse_house_index_zip(zip_bytes: bytes, year: int) -> list[RawFiling]:
 
 def parse_house_ptr_text(text: str, raw: RawFiling, confidence: float = 0.8) -> list[dict]:
     records: list[dict] = []
-    for line in _logical_lines(text):
+    lines = _logical_lines(text)
+    for line in lines:
         if _is_header_line(line):
             continue
-        parsed = _parse_delimited_row(line) or _parse_freeform_row(line)
+        parsed = _parse_delimited_row(line)
+        if not parsed:
+            continue
+        records.append(
+            {
+                "doc_id": raw.doc_id,
+                "source": raw.source,
+                "member_name": raw.member_name,
+                "filing_date": raw.filing_date.isoformat(),
+                "url": raw.url,
+                "source_quality": "official",
+                "parse_confidence": confidence,
+                "raw_ref": line,
+                **parsed,
+            }
+        )
+    if records:
+        return records
+    for parsed in _parse_house_table_blocks(lines):
+        records.append(
+            {
+                "doc_id": raw.doc_id,
+                "source": raw.source,
+                "member_name": raw.member_name,
+                "filing_date": raw.filing_date.isoformat(),
+                "url": raw.url,
+                "source_quality": "official",
+                "parse_confidence": confidence,
+                "raw_ref": parsed.pop("raw_ref", ""),
+                **parsed,
+            }
+        )
+    if records:
+        return records
+    for line in lines:
+        if _is_header_line(line):
+            continue
+        parsed = _parse_freeform_row(line)
         if not parsed:
             continue
         records.append(
@@ -229,9 +267,18 @@ def _parse_house_date(value: str | None, year: int) -> date | None:
     return parse_optional_date(text)
 
 
+def _house_member_name(children: dict[str, str]) -> str:
+    if children.get("name"):
+        return children["name"]
+    parts = [children.get("first", ""), children.get("last", ""), children.get("suffix", "")]
+    name = " ".join(part.strip() for part in parts if part.strip())
+    return name or "Unknown"
+
+
 def _logical_lines(text: str) -> list[str]:
     lines = []
     for line in text.splitlines():
+        line = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", line)
         clean = re.sub(r"\s+", " ", line).strip()
         if clean:
             lines.append(clean)
@@ -294,6 +341,142 @@ def _parse_freeform_row(line: str) -> dict | None:
         "amount": amount_match.group(1),
         "owner": "self",
     }
+
+
+def _parse_house_table_blocks(lines: list[str]) -> list[dict]:
+    records: list[dict] = []
+    block: list[str] = []
+    for line in lines:
+        if _is_house_table_boundary(line):
+            parsed = _parse_house_transaction_block(block)
+            if parsed:
+                records.append(parsed)
+            block = []
+            continue
+        if _is_house_table_noise(line):
+            continue
+        block.append(line)
+    parsed = _parse_house_transaction_block(block)
+    if parsed:
+        records.append(parsed)
+    return records
+
+
+def _parse_house_transaction_block(block: list[str]) -> dict | None:
+    if not block:
+        return None
+    text = re.sub(r"\s+", " ", " ".join(block)).strip()
+    pattern = re.compile(
+        r"^(?P<asset>.+?)\s*(?:\[(?P<asset_code>[A-Z]{2})\])?\s+"
+        r"(?P<tx_type>P|S(?:\s*\(partial\))?|E)\s+"
+        r"(?P<tx_date>\d{1,2}/\d{1,2}/\d{4})\s*"
+        r"(?P<notification_date>\d{1,2}/\d{1,2}/\d{4})?\s*"
+        r"(?P<amount>(?:Over\s+)?\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:-|to|–)\s*\$?\s*\d[\d,]*(?:\.\d+)?)?)",
+        flags=re.IGNORECASE,
+    )
+    match = pattern.search(text)
+    if not match:
+        return None
+    asset = match.group("asset").strip(" -;,")
+    owner, asset = _extract_house_owner(asset)
+    ticker = _extract_house_ticker(asset)
+    asset_name = _clean_house_asset_name(asset, ticker)
+    tx_type = _normalize_house_tx_type(match.group("tx_type"))
+    amount = re.sub(r"\s+", " ", match.group("amount").replace("–", "-")).strip()
+    amount = re.sub(r"\s*-\s*", " - ", amount)
+    asset_code = (match.group("asset_code") or "").upper()
+    parsed = {
+        "tx_date": match.group("tx_date"),
+        "ticker": ticker,
+        "asset_name": asset_name,
+        "tx_type": tx_type,
+        "amount": amount,
+        "owner": owner,
+        "raw_ref": text,
+    }
+    asset_type = _asset_type_from_house_code(asset_code, asset_name)
+    if asset_type:
+        parsed["asset_type"] = asset_type
+    return parsed
+
+
+def _is_house_table_boundary(line: str) -> bool:
+    text = line.strip()
+    if text.startswith("* For the complete list"):
+        return True
+    if text.startswith("Filing ID #"):
+        return True
+    if re.match(r"^(Filing Status|Subholding Of|Description|Comments?|Location)\s*:", text, flags=re.IGNORECASE):
+        return True
+    if re.match(r"^(F\s*S|S\s*O|D|C|L)\s*:", text):
+        return True
+    if "CERTIFY" in text or text.startswith("Digitally Signed:"):
+        return True
+    return False
+
+
+def _is_house_table_noise(line: str) -> bool:
+    text = line.strip()
+    lower = text.lower()
+    if _is_header_line(text):
+        return True
+    if lower in {"periodic transaction report", "id owner asset transaction"}:
+        return True
+    if text in {"Type", "Date Notification", "Date", "Amount Cap.", "Gains >", "$200?", "Yes No"}:
+        return True
+    if lower.startswith(("clerk of the house", "name:", "status:", "state/district:")):
+        return True
+    if re.fullmatch(r"[A-Z](?:\s+[A-Z]){1,}", text):
+        return True
+    return False
+
+
+def _extract_house_owner(asset: str) -> tuple[str, str]:
+    owner_codes = {"DC": "dependent", "JT": "joint", "SP": "spouse"}
+    parts = asset.split(maxsplit=1)
+    if parts and parts[0].upper() in {"T"} and len(parts) > 1:
+        asset = parts[1]
+    parts = asset.split(maxsplit=1)
+    if parts and parts[0].upper() in owner_codes and len(parts) > 1:
+        return owner_codes[parts[0].upper()], parts[1]
+    return "self", asset
+
+
+def _extract_house_ticker(asset: str) -> str | None:
+    matches = re.findall(r"\(([A-Z][A-Z0-9.\-]{0,9})\)", asset)
+    return matches[-1] if matches else None
+
+
+def _clean_house_asset_name(asset: str, ticker: str | None) -> str:
+    if ticker:
+        asset = re.sub(rf"\s*\({re.escape(ticker)}\)\s*", " ", asset)
+    asset = re.sub(r"\s+", " ", asset)
+    return asset.strip(" -;,") or ticker or "Unknown"
+
+
+def _normalize_house_tx_type(value: str) -> str:
+    text = re.sub(r"\s+", " ", value.strip().upper())
+    if text == "P":
+        return "Purchase"
+    if text.startswith("S"):
+        return "Sale (Partial)" if "PARTIAL" in text else "Sale"
+    if text == "E":
+        return "Exchange"
+    return value
+
+
+def _asset_type_from_house_code(code: str, asset_name: str) -> str | None:
+    if code == "ST":
+        return "stock"
+    if code == "EF":
+        return "etf"
+    if code == "GS":
+        return "bond"
+    if code == "OT" and re.search(r"\b(option|call|put)\b", asset_name, flags=re.IGNORECASE):
+        return "option"
+    if code in {"CS", "OI", "OT"}:
+        return "other"
+    return None
 
 
 def _parse_index_payload(payload: dict) -> dict | None:

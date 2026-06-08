@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from backtest.metrics import compute_metrics
-from backtest.simulator import run_backtest
+from backtest.simulator import run_backtest, validate_backtest
 from analytics.member_score import compute_member_scores
 from broker.paper_broker import PaperBroker
 from core.config_loader import load_config
@@ -369,6 +369,34 @@ class RiskExecutionBacktestTests(unittest.TestCase):
         self.assertEqual(baseline["signals"], with_future["signals"])
         self.assertEqual(baseline["metrics"], with_future["metrics"])
         self.assertEqual(run_backtest_scheduler.run(dry_run=True, days=1095)["days"], 1095)
+
+    def test_backtest_validation_requires_positive_benchmark_edge(self) -> None:
+        verdict = validate_backtest(
+            {"trade_count": 10, "max_drawdown": 0.0, "total_return": 0.10, "vs_benchmark": -0.01},
+            {"spy": {"total_return": 0.001}},
+        )
+        self.assertEqual(verdict["verdict"], "watch")
+        self.assertEqual(verdict["reason"], "strategy has not beaten benchmark curve")
+
+    def test_backtest_non_dry_run_uses_configured_dataset(self) -> None:
+        original_backtest_load_config = run_backtest_scheduler.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = load_config()
+                dataset_path = Path(tmp) / "transactions.json"
+                reports_dir = Path(tmp) / "reports"
+                cfg["backtest"] = {"dataset_path": str(dataset_path)}
+                cfg["reports_dir"] = str(reports_dir)
+                run_backtest_scheduler.load_config = lambda: cfg
+                write_json(dataset_path, sample_transactions())
+
+                result = run_backtest_scheduler.run(dry_run=False, days=180)
+
+                self.assertEqual(result["dataset"], str(dataset_path))
+                self.assertEqual(result["input_transactions"], len(sample_transactions()))
+                self.assertTrue((reports_dir / "backtest" / "latest.json").exists())
+        finally:
+            run_backtest_scheduler.load_config = original_backtest_load_config
 
 
 if __name__ == "__main__":

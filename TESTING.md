@@ -20,6 +20,16 @@ python3 scheduler/run_health_check.py --dry-run
 python3 scheduler/run_live_promotion_check.py --dry-run
 ```
 
+Run the checked-in real-data backtest and write `reports/backtest/latest.json`:
+
+```bash
+python3 scheduler/run_backtest.py --days 186
+```
+
+The checked-in real-data backtest currently uses official House disclosure data plus
+the simulator fallback return model unless a report shows
+`market_data.price_history_supplied=true`.
+
 Validate Terraform deployment artifacts:
 
 ```bash

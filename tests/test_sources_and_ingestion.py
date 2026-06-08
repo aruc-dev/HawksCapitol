@@ -67,12 +67,14 @@ class SourcesAndIngestionTests(unittest.TestCase):
         <FinancialDisclosureReports>
           <Report><DocID>100</DocID><FilingType>P</FilingType><Name>Demo Senator</Name><FilingDate>2026-06-01</FilingDate></Report>
           <Report><DocID>101</DocID><FilingType>A</FilingType><Name>Other</Name><FilingDate>2026-06-01</FilingDate></Report>
+          <Report><DocID>103</DocID><FilingType>P</FilingType><First>Mark</First><Last>Alford</Last><FilingDate>2026-06-02</FilingDate></Report>
           <Report><DocID>102</DocID><FilingType>P</FilingType><Name>Bad Date</Name><FilingDate>not-a-date</FilingDate></Report>
         </FinancialDisclosureReports>
         """
         filings = parse_house_index(xml, 2026)
-        self.assertEqual(len(filings), 1)
+        self.assertEqual(len(filings), 2)
         self.assertEqual(filings[0].doc_id, "100")
+        self.assertEqual(filings[1].member_name, "Mark Alford")
 
     def test_house_index_zip_and_cache_fetch_are_fixture_safe(self) -> None:
         xml = """
@@ -116,6 +118,45 @@ class SourcesAndIngestionTests(unittest.TestCase):
         plain_text, plain_confidence = extract_text_from_pdf_bytes(b"Transaction Date | Asset | Ticker\n2026-05-01 | Apple Inc. | AAPL")
         self.assertIn("Apple Inc.", plain_text)
         self.assertEqual(plain_confidence, 0.8)
+
+    def test_house_real_ptr_table_blocks_normalize(self) -> None:
+        text = """
+        Periodic Transaction Report
+        ID Owner Asset Transaction
+        Type
+        Date Notification
+        Date
+        Amount Cap.
+        Gains >
+        $200?
+        Netflix, Inc. - Common Stock (NFLX)
+        [ST]
+        P 11/20/202511/20/2025 $100,001 -
+        $250,000
+        Filing Status: New
+        JT CSW Industrials, Inc. Common Stock
+        (CSW) [ST]
+        P 11/17/202512/04/2025$1,001 - $15,000
+        Filing Status: New
+        T DC Innovex International, Inc. Common
+        Stock (INVX) [ST]
+        S 11/25/202511/26/2025 $1,140.00
+        Filing Status: New
+        BRKB Option [OT] P 11/19/202512/01/2025 $15,001 -
+        $50,000
+        Description: CALL BERKSHIRE CL B NEW $380 EXP 01/16/26
+        """
+        raw = RawFiling("house_clerk", "real-1", "Demo Representative", date(2025, 12, 10))
+        rows = parse_house_ptr_text(text, raw, 0.9)
+        self.assertEqual([row["ticker"] for row in rows], ["NFLX", "CSW", "INVX", None])
+        self.assertEqual(rows[0]["asset_type"], "stock")
+        self.assertEqual(rows[1]["owner"], "joint")
+        self.assertEqual(rows[2]["owner"], "dependent")
+        self.assertEqual(rows[3]["asset_type"], "option")
+        _, txs = normalize_records(rows, TickerResolver())
+        self.assertEqual(txs[0].tx_type, "buy")
+        self.assertEqual(txs[2].amount_mid, 1140.0)
+        self.assertEqual(txs[3].asset_type, "option")
 
     def test_house_source_parses_fixture_pdf_and_ingest_source_dry_run(self) -> None:
         xml = """

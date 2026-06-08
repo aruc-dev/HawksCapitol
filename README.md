@@ -38,6 +38,7 @@ python3 scheduler/run_score.py --dry-run
 python3 scheduler/run_scan.py --dry-run
 python3 scheduler/run_risk_check.py --dry-run
 python3 scheduler/run_backtest.py --dry-run
+python3 scheduler/run_backtest.py --days 186
 python3 scheduler/run_report.py --dry-run
 python3 scheduler/run_weekly_report.py --dry-run
 python3 scheduler/run_health_check.py --dry-run
@@ -48,6 +49,19 @@ scripts/validate_paper_deploy.sh
 
 The default config is `mode: paper`. Live execution is blocked unless explicitly
 approved in-session and configured in `config/config.yaml`.
+
+## Backtesting Data
+
+Dry-run backtests use the small deterministic sample dataset. Non-dry-run backtests
+default to the checked-in official House Clerk dataset at
+`data/backtest/official_house_6mo/transactions.json`, covering filings from
+2025-12-01 through 2026-06-04. The latest generated report is written to
+`reports/backtest/latest.json`.
+
+The checked-in dataset contains official disclosure transactions only. Until approved
+historical market-price data is added, reports with
+`market_data.price_history_supplied=false` use the simulator fallback return model
+rather than price-realized returns.
 
 ## Runtime Data Safety
 
