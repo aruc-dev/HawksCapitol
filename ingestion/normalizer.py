@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from core.models import Disclosure, Transaction, parse_date
 from sources.ticker_resolver import TickerResolver
+
+UTC = timezone.utc
 
 
 def parse_amount_range(text: str) -> tuple[float, float, float]:

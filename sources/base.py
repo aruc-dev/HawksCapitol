@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Protocol
+
+UTC = timezone.utc
 
 
 @dataclass(frozen=True)

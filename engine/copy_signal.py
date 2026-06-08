@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 
 from analytics.alpha_decay import freshness_score
 from core.atr_sizing import calculate_position_qty
@@ -8,6 +8,8 @@ from core.models import MemberScore, Signal, Transaction
 from core.risk_manager import portfolio_caps_allow
 from engine.conviction import conviction_score
 from engine.entry_quality import entry_quality_score
+
+UTC = timezone.utc
 
 
 def build_copy_signals(

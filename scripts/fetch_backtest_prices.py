@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 import os
 from pathlib import Path
 import sys
@@ -14,6 +14,7 @@ from ingestion.storage import write_json
 
 
 ALPACA_STOCK_BARS_URL = "https://data.alpaca.markets/v2/stocks/bars"
+UTC = timezone.utc
 
 
 def run(
