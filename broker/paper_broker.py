@@ -60,15 +60,28 @@ class PaperBroker:
     def _load(self) -> None:
         if not self.state_path:
             return
-        state = read_json(self.state_path, {"orders": [], "positions": []})
-        self.orders = {
-            row["client_order_id"]: OrderResult(**row)
-            for row in state.get("orders", [])
-        }
-        self._positions = {
-            row["ticker"]: BrokerPosition(**row)
-            for row in state.get("positions", [])
-        }
+        try:
+            state = read_json(self.state_path, {"orders": [], "positions": []})
+        except (OSError, ValueError):
+            state = {"orders": [], "positions": []}
+        if not isinstance(state, dict):
+            return
+        self.orders = {}
+        for row in state.get("orders", []):
+            if not isinstance(row, dict) or not row.get("client_order_id"):
+                continue
+            try:
+                self.orders[row["client_order_id"]] = OrderResult(**row)
+            except TypeError:
+                continue
+        self._positions = {}
+        for row in state.get("positions", []):
+            if not isinstance(row, dict) or not row.get("ticker"):
+                continue
+            try:
+                self._positions[row["ticker"]] = BrokerPosition(**row)
+            except TypeError:
+                continue
 
     def _save(self) -> None:
         if not self.state_path:
