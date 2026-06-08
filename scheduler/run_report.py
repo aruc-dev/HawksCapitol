@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from core.config_loader import load_config
 from core.serialization import to_jsonable
 from ingestion.storage import write_json
 from scheduler.run_backtest import run as run_backtest_report
@@ -14,7 +15,9 @@ from scheduler.run_risk_check import run as run_risk
 from scheduler.run_scan import run as run_scan_report
 
 
-def run(dry_run: bool = False) -> dict:
+def run(dry_run: bool = False, reports_dir: str | Path | None = None) -> dict:
+    cfg = load_config()
+    report_dir = Path(reports_dir or cfg.get("reports_dir", "reports"))
     scan = run_scan_report(dry_run=True)
     backtest = run_backtest_report(dry_run=True)
     health = run_health(dry_run=True)
@@ -34,7 +37,7 @@ def run(dry_run: bool = False) -> dict:
         "risk": risk,
     }
     if not dry_run:
-        write_json("reports/daily/latest.json", report)
+        write_json(report_dir / "daily" / "latest.json", report)
     return report
 
 

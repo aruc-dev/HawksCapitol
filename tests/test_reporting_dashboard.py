@@ -9,7 +9,7 @@ import tempfile
 from broker.paper_broker import PaperBroker
 from core.models import Order
 from dashboard.app import render_dashboard_html
-from scheduler import run_health_check, run_report
+from scheduler import run_health_check, run_report, run_weekly_report
 
 
 class ReportingDashboardTests(unittest.TestCase):
@@ -57,6 +57,25 @@ class ReportingDashboardTests(unittest.TestCase):
         self.assertIn("Signals", html)
         self.assertIn("Sources", html)
         self.assertIn("house_clerk", html)
+
+    def test_reports_use_configured_reports_dir(self) -> None:
+        original_daily_load_config = run_report.load_config
+        original_weekly_load_config = run_weekly_report.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = original_daily_load_config()
+                cfg["reports_dir"] = str(Path(tmp) / "custom-reports")
+                run_report.load_config = lambda: cfg
+                run_weekly_report.load_config = lambda: cfg
+
+                run_report.run(dry_run=False)
+                run_weekly_report.run(dry_run=False)
+
+                self.assertTrue((Path(cfg["reports_dir"]) / "daily" / "latest.json").exists())
+                self.assertTrue((Path(cfg["reports_dir"]) / "weekly" / "latest.json").exists())
+        finally:
+            run_report.load_config = original_daily_load_config
+            run_weekly_report.load_config = original_weekly_load_config
 
 
 if __name__ == "__main__":

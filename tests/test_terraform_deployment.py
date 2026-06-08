@@ -43,6 +43,7 @@ class TerraformDeploymentTests(unittest.TestCase):
         self.assertIn("Secret values must be written outside Terraform", text)
         self.assertNotIn("ALPACA_SECRET_KEY", tfvars)
         self.assertNotIn("ALPACA_API_KEY", tfvars)
+        self.assertIn("secret_id             = local.secret_arn", text)
         self.assertIn('cfg["mode"] != "paper"', user_data)
         self.assertIn('execution.allow_live=true', user_data)
 
@@ -55,7 +56,7 @@ class TerraformDeploymentTests(unittest.TestCase):
             "pip install -r requirements.txt",
             "cp scheduler/systemd/hawkscapitol-*.service",
             "hawkscapitol-secrets.service.d",
-            'Environment="HAWKSCAPITOL_SECRET_ID=$${secret_name}"',
+            'Environment="HAWKSCAPITOL_SECRET_ID=$${secret_id}"',
             "systemctl daemon-reload",
             "HAWKSCAPITOL_DRY_RUN=1 scripts/fetch_secrets.sh",
             "python3 -m unittest discover -v",

@@ -11,7 +11,7 @@ resource "aws_instance" "paper_node" {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
     repository_url        = var.repository_url
     repository_ref        = var.repository_ref
-    secret_name           = var.secret_name
+    secret_id             = local.secret_arn
     enable_systemd_timers = var.enable_systemd_timers
     systemd_timers        = local.systemd_timers
   })

@@ -6,7 +6,7 @@ exec > >(tee -a /var/log/hawkscapitol-bootstrap.log) 2>&1
 repo_dir="/home/ec2-user/HawksCapitol"
 repo_url="${repository_url}"
 repo_ref="${repository_ref}"
-secret_name="${secret_name}"
+secret_id="${secret_id}"
 enable_timers="${enable_systemd_timers}"
 
 dnf update -y
@@ -42,11 +42,11 @@ cp scheduler/systemd/hawkscapitol-*.timer /etc/systemd/system/
 install -d -m 0755 /etc/systemd/system/hawkscapitol-secrets.service.d
 cat >/etc/systemd/system/hawkscapitol-secrets.service.d/10-terraform-secret.conf <<EOF
 [Service]
-Environment="HAWKSCAPITOL_SECRET_ID=$${secret_name}"
+Environment="HAWKSCAPITOL_SECRET_ID=$${secret_id}"
 EOF
 systemctl daemon-reload
 
-HAWKSCAPITOL_SECRET_ID="$${secret_name}" HAWKSCAPITOL_DRY_RUN=1 scripts/fetch_secrets.sh
+HAWKSCAPITOL_SECRET_ID="$${secret_id}" HAWKSCAPITOL_DRY_RUN=1 scripts/fetch_secrets.sh
 python3 -m unittest discover -v
 python3 scheduler/run_health_check.py --dry-run
 python3 scheduler/run_live_promotion_check.py --dry-run

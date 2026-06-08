@@ -19,11 +19,15 @@ from ingestion.storage import write_json
 
 def run(
     dry_run: bool = False,
-    broker_state_path: str | Path = "data/paper_broker/state.json",
-    trade_log_path: str | Path = "data/trade_log.json",
-    signals_path: str | Path = "data/signals/latest.json",
+    broker_state_path: str | Path | None = None,
+    trade_log_path: str | Path | None = None,
+    signals_path: str | Path | None = None,
 ) -> dict:
     cfg = load_config()
+    data_dir = Path(cfg.get("data_dir", "data"))
+    broker_state_path = Path(broker_state_path) if broker_state_path is not None else data_dir / "paper_broker" / "state.json"
+    trade_log_path = Path(trade_log_path) if trade_log_path is not None else data_dir / "trade_log.json"
+    signals_path = Path(signals_path) if signals_path is not None else data_dir / "signals" / "latest.json"
     txs = sample_transactions()
     as_of = sample_as_of()
     scores = compute_member_scores(txs, as_of)

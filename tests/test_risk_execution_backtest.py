@@ -175,6 +175,28 @@ class RiskExecutionBacktestTests(unittest.TestCase):
             reconciliation = reconcile_trade_log.run(dry_run=True, broker_state_path=state_path, trade_log_path=trade_log_path)
             self.assertEqual(reconciliation["missing_in_broker"], [])
 
+    def test_scan_and_reconcile_use_configured_data_dir_by_default(self) -> None:
+        original_scan_load_config = run_scan.load_config
+        original_reconcile_load_config = reconcile_trade_log.load_config
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                cfg = original_scan_load_config()
+                cfg["data_dir"] = str(Path(tmp) / "custom-data")
+                run_scan.load_config = lambda: cfg
+                reconcile_trade_log.load_config = lambda: cfg
+
+                run_scan.run(dry_run=False)
+                reconciliation = reconcile_trade_log.run(dry_run=True)
+
+                data_dir = Path(cfg["data_dir"])
+                self.assertTrue((data_dir / "paper_broker" / "state.json").exists())
+                self.assertTrue((data_dir / "signals" / "latest.json").exists())
+                self.assertTrue((data_dir / "trade_log.json").exists())
+                self.assertEqual(reconciliation["missing_in_broker"], [])
+        finally:
+            run_scan.load_config = original_scan_load_config
+            reconcile_trade_log.load_config = original_reconcile_load_config
+
     def test_protective_stop_plans_are_deterministic(self) -> None:
         pos = Position("trade-1", "AAPL", "stock", date(2026, 6, 1), 100, 5, 92, 120, 100)
         stops = sync_protective_stops([pos])
